@@ -102,10 +102,10 @@ impl Popup for GoToLinePopup {
     }
 
     fn map_mouse(&mut self, event: MouseEvent, _: &mut Components) -> Status {
-        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event {
-            if !self.render_line.contains_position(row, column) {
-                return Status::Finished;
-            }
+        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event
+            && !self.render_line.contains_position(row, column)
+        {
+            return Status::Finished;
         };
         Status::Pending
     }
@@ -152,10 +152,9 @@ impl Popup for FindPopup {
                 *gs.editor_area(),
                 self.accent,
                 self.state,
-            ) {
-                if let Err(error) = popup.main_loop(gs, ws, tree, term) {
-                    gs.error(error);
-                };
+            ) && let Err(error) = popup.main_loop(gs, ws, tree, term)
+            {
+                gs.error(error);
             }
             return Status::Finished;
         }
@@ -262,10 +261,10 @@ impl Popup for FindPopup {
     }
 
     fn map_mouse(&mut self, event: MouseEvent, _: &mut Components) -> Status {
-        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event {
-            if !self.render_line.contains_position(row, column) {
-                return Status::Finished;
-            }
+        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event
+            && !self.render_line.contains_position(row, column)
+        {
+            return Status::Finished;
         };
         Status::Pending
     }

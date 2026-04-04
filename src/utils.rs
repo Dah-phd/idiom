@@ -91,6 +91,7 @@ impl<T> TrackedList<T> {
         self.inner.get(index)
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn inner(&self) -> &Vec<T> {
         &self.inner
@@ -156,6 +157,7 @@ impl<T> TrackedList<T> {
         self.inner.push(element);
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn pop(&mut self) -> Option<T> {
         let result = self.inner.pop();

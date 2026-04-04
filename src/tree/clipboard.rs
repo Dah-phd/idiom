@@ -167,11 +167,11 @@ fn fs_recursive_copy(mut dest: PathBuf, path: PathBuf, error_list: &mut Vec<Idio
     } else {
         match path.file_stem() {
             Some(name) => {
-                if !dest.exists() {
-                    if let Err(error) = std::fs::create_dir_all(dest.as_path()) {
-                        error_list.push(IdiomError::IOError(error));
-                        return;
-                    }
+                if !dest.exists()
+                    && let Err(error) = std::fs::create_dir_all(dest.as_path())
+                {
+                    error_list.push(IdiomError::IOError(error));
+                    return;
                 }
                 let mut suffixed_name = SuffixedNameIter::new(name, path.extension());
                 let mut potential_dest = dest.join(suffixed_name.next().unwrap());

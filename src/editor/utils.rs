@@ -1,6 +1,6 @@
 use super::{
-    Actions, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily, FileType, GlobalState,
-    Lexer, TuiCodec, controls::ControlMap,
+    Actions, BUFFER, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily, FileType,
+    GlobalState, Lexer, TuiCodec, controls::ControlMap,
 };
 use crate::error::{IdiomError, IdiomResult};
 use std::{
@@ -191,7 +191,7 @@ pub fn editor_from_data(
     let mut editor = Editor {
         actions: Actions::new(cfg.get_indent_cfg(file_type)),
         controls: ControlMap::default(),
-        saved_version: 0,
+        saved_version: BUFFER,
         codec: renderer,
         cursor,
         line_number_padding: line_number_offset,

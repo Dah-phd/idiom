@@ -11,7 +11,7 @@ use crate::{
         Theme, TreeKeyMap, UITheme,
     },
     cursor::CursorPosition,
-    editor::EditorStats,
+    editor::{Editor, EditorStats},
     embeded_term::EditorTerminal,
     error::IdiomResult,
     ext_tui::{CrossTerm, StyleExt},
@@ -19,6 +19,7 @@ use crate::{
     popups::{
         Popup, checked_new_screen_size,
         menu::{menu_context_editor_inplace, menu_context_tree_inplace},
+        popups_editor::file_updated,
     },
     tree::Tree,
     workspace::Workspace,
@@ -159,6 +160,15 @@ impl GlobalState {
         (self.paste_passthrough)(self, clip, workspace, term);
     }
 
+    /// changes mode to select clearing editor area
+    pub fn select_mode_no_editor(&mut self) {
+        self.clear_stats();
+        if self.components.contains(Components::TREE) {
+            self.editor_area.clear(&mut self.backend);
+        }
+        self.select_mode();
+    }
+
     pub fn select_mode(&mut self) {
         self.mode = Mode::Select;
         self.config_controls();
@@ -254,6 +264,16 @@ impl GlobalState {
     pub fn try_tree_event(&mut self, value: impl TryInto<IdiomEvent>) {
         if let Ok(event) = value.try_into() {
             self.event.push(event);
+        }
+    }
+
+    pub fn select_editor_events(&mut self, editor: &Editor) {
+        if editor.file_status_is_buffer() {
+            return;
+        }
+        self.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
+        if editor.file_status_is_update() {
+            self.event.push(file_updated(editor.path().to_owned()).into());
         }
     }
 

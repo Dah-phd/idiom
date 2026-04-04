@@ -414,7 +414,13 @@ impl Tree {
         let rel_result = (self.path_parser)(path);
         let path = rel_result.as_ref().unwrap_or(path);
 
+        // path outside of tree
         if !path.starts_with(self.inner.path()) {
+            return Ok(());
+        }
+
+        // path is already selected
+        if path == &self.selected_path {
             return Ok(());
         }
 

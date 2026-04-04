@@ -105,15 +105,15 @@ impl Popup for OpenFileSelector {
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
 
-        if self.state.selected != 0 {
-            if let KeyEvent { code: KeyCode::Enter | KeyCode::Tab, .. } = key {
-                let mut text = self.paths.remove(self.state.selected);
-                if PathBuf::from(&text).is_dir() && !text.ends_with(MAIN_SEPARATOR) {
-                    text.push(MAIN_SEPARATOR);
-                }
-                self.pattern.text_set(text);
-                self.solve_comletions();
+        if self.state.selected != 0
+            && let KeyEvent { code: KeyCode::Enter | KeyCode::Tab, .. } = key
+        {
+            let mut text = self.paths.remove(self.state.selected);
+            if PathBuf::from(&text).is_dir() && !text.ends_with(MAIN_SEPARATOR) {
+                text.push(MAIN_SEPARATOR);
             }
+            self.pattern.text_set(text);
+            self.solve_comletions();
         }
         match key {
             KeyEvent { code: KeyCode::Up, .. } => {

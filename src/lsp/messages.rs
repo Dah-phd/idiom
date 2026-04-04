@@ -41,16 +41,14 @@ impl From<Value> for LSPMessage {
                 });
             }
         }
-        if let Some(method) = obj.get("method") {
-            if method == PublishDiagnostics::METHOD {
-                if let Some(PublishDiagnosticsParams { uri, diagnostics, .. }) = obj
-                    .get_mut("params")
-                    .map(Value::take)
-                    .and_then(|params| from_value::<PublishDiagnosticsParams>(params).ok())
-                {
-                    return LSPMessage::Diagnostic(uri, Diagnostic::new(diagnostics));
-                }
-            }
+        if let Some(method) = obj.get("method")
+            && method == PublishDiagnostics::METHOD
+            && let Some(PublishDiagnosticsParams { uri, diagnostics, .. }) = obj
+                .get_mut("params")
+                .map(Value::take)
+                .and_then(|params| from_value::<PublishDiagnosticsParams>(params).ok())
+        {
+            return LSPMessage::Diagnostic(uri, Diagnostic::new(diagnostics));
         };
         LSPMessage::Unknown(obj)
     }

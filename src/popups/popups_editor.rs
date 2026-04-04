@@ -10,8 +10,7 @@ pub fn selector_editors(options: Vec<String>) -> PopupSelector<String> {
         |editor, line, backend| line.render(editor, backend),
         |popup, components| {
             let Components { gs, ws, .. } = components;
-            ws.activate_editor(popup.state.selected, gs);
-            if ws.get_active().is_some() {
+            if ws.activate_editor(popup.state.selected, gs).is_some() {
                 gs.insert_mode();
             }
         },

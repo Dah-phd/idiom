@@ -110,10 +110,10 @@ pub fn mouse_handler(
                         _ => editor.mouse_click(position, gs),
                     };
                     gs.insert_mode();
-                    match tree.select_by_path(editor.path()) {
-                        Ok(..) => ws.toggle_editor(),
-                        Err(error) => gs.error(error),
-                    };
+                    if !editor.file_status_is_buffer() {
+                        gs.log_if_error(tree.select_by_path(editor.path()));
+                    }
+                    ws.toggle_editor();
                 }
             } else if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
                 let pos_line = position.row as usize + 1;
@@ -123,10 +123,12 @@ pub fn mouse_handler(
                 }
             } else if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !ws.is_empty() {
-                    gs.select_mode();
                     let pos_char = pos.col as usize;
-                    if let Some(idx) = ws.select_tab_mouse(pos_char) {
-                        ws.activate_editor(idx, gs);
+                    if ws.select_tab_mouse(pos_char, gs).is_some() {
+                        if gs.is_select() {
+                            gs.insert_mode();
+                        }
+                        ws.toggle_editor();
                     };
                 }
             } else if gs.tree_area.relative_position(event.row + 2, event.column).is_some() {
@@ -146,11 +148,9 @@ pub fn mouse_handler(
                 };
             } else if let Some(position) = gs.tab_area.relative_position(event.row, event.column) {
                 if !ws.is_empty() {
-                    gs.insert_mode();
                     let pos_char = position.col as usize;
-                    if let Some(idx) = ws.select_tab_mouse(pos_char) {
-                        ws.activate_editor(idx, gs);
-                        ws.close_active(gs);
+                    if ws.is_close_tab_mouse(pos_char, gs) && gs.is_insert() {
+                        ws.toggle_tabs();
                     }
                 }
             } else if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
@@ -166,12 +166,12 @@ pub fn mouse_handler(
             }
         }
         MouseEventKind::Drag(MouseButton::Left) => {
-            if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
-                if let Some(editor) = ws.get_active() {
-                    editor.mouse_select(position.into());
-                    gs.insert_mode();
-                    ws.toggle_editor();
-                }
+            if let Some(position) = gs.editor_area.relative_position(event.row, event.column)
+                && let Some(editor) = ws.get_active()
+            {
+                editor.mouse_select(position.into());
+                gs.insert_mode();
+                ws.toggle_editor();
             }
         }
         _ => (),

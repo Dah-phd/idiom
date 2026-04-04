@@ -289,13 +289,13 @@ pub fn parse_color(obj: Value) -> Result<Color, String> {
     match obj {
         Value::String(data) => from_str(&data).map_err(|e| e.to_string()),
         Value::Object(map) => {
-            if let Some(Value::Array(rgb_value)) = map.get("rgb").or(map.get("Rgb").or(map.get("RGB"))) {
-                if rgb_value.len() == 3 {
-                    let b = object_to_u8(rgb_value[2].clone()).ok_or("Failed to parse B in RGB color")?;
-                    let g = object_to_u8(rgb_value[1].clone()).ok_or("Failed to parse G in RGB color")?;
-                    let r = object_to_u8(rgb_value[0].clone()).ok_or("Failed to parse R in RGB color")?;
-                    return Ok(Color::Rgb { r, g, b });
-                }
+            if let Some(Value::Array(rgb_value)) = map.get("rgb").or(map.get("Rgb").or(map.get("RGB")))
+                && rgb_value.len() == 3
+            {
+                let b = object_to_u8(rgb_value[2].clone()).ok_or("Failed to parse B in RGB color")?;
+                let g = object_to_u8(rgb_value[1].clone()).ok_or("Failed to parse G in RGB color")?;
+                let r = object_to_u8(rgb_value[0].clone()).ok_or("Failed to parse R in RGB color")?;
+                return Ok(Color::Rgb { r, g, b });
             };
             Err(String::from("When representing Color as Object(Map) - should be {\"rgb\": [number, number, number]}!"))
         }
@@ -304,13 +304,13 @@ pub fn parse_color(obj: Value) -> Result<Color, String> {
 }
 
 pub fn parse_raw_rgb(map: Value) -> Result<(u8, u8, u8), String> {
-    if let Some(Value::Array(rgb_value)) = map.get("rgb").or(map.get("Rgb").or(map.get("RGB"))) {
-        if rgb_value.len() == 3 {
-            let b = object_to_u8(rgb_value[2].clone()).ok_or("Failed to parse B in RGB color")?;
-            let g = object_to_u8(rgb_value[1].clone()).ok_or("Failed to parse G in RGB color")?;
-            let r = object_to_u8(rgb_value[0].clone()).ok_or("Failed to parse R in RGB color")?;
-            return Ok((r, g, b));
-        }
+    if let Some(Value::Array(rgb_value)) = map.get("rgb").or(map.get("Rgb").or(map.get("RGB")))
+        && rgb_value.len() == 3
+    {
+        let b = object_to_u8(rgb_value[2].clone()).ok_or("Failed to parse B in RGB color")?;
+        let g = object_to_u8(rgb_value[1].clone()).ok_or("Failed to parse G in RGB color")?;
+        let r = object_to_u8(rgb_value[0].clone()).ok_or("Failed to parse R in RGB color")?;
+        return Ok((r, g, b));
     };
     Err(String::from("When representing Color as Object(Map) - should be {\"rgb\": [number, number, number]}!"))
 }

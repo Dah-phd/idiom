@@ -1,8 +1,10 @@
-use crate::configs::{APP_FOLDER, FileType};
-use crate::cursor::Cursor;
-use crate::error::{IdiomError, IdiomResult};
-use crate::global_state::{GlobalState, IdiomEvent};
-use crate::workspace::Workspace;
+use crate::{
+    configs::{APP_FOLDER, FileType},
+    cursor::Cursor,
+    error::{IdiomError, IdiomResult},
+    global_state::GlobalState,
+    workspace::Workspace,
+};
 use dirs::data_local_dir;
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -198,7 +200,7 @@ fn load_session_if_exists(store: PathBuf, ws: &mut Workspace, gs: &mut GlobalSta
         _ = std::fs::remove_dir_all(path);
 
         let Some(editor) = ws.get_active() else { return };
-        gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
+        gs.select_editor_events(editor);
 
         if gs.is_select() {
             gs.insert_mode();
