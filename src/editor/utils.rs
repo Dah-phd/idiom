@@ -18,10 +18,10 @@ pub struct EditorStats {
 pub fn build_display(path: &Path) -> String {
     let mut buffer = Vec::new();
     let mut text_path = path.display().to_string();
-    if let Ok(base_path) = PathBuf::from("./").canonicalize().map(|p| p.display().to_string()) {
-        if text_path.starts_with(&base_path) {
-            text_path.replace_range(..base_path.len(), "");
-        }
+    if let Ok(base_path) = PathBuf::from("./").canonicalize().map(|p| p.display().to_string())
+        && text_path.starts_with(&base_path)
+    {
+        text_path.replace_range(..base_path.len(), "");
     }
     for part in text_path.split(MAIN_SEPARATOR).rev().take(2) {
         buffer.insert(0, part);

@@ -77,12 +77,12 @@ impl EditorTerminal {
                 CrossTerm::detached_hide_cursor();
             }
             event_key => {
-                if let Some(term) = self.terminal.as_mut() {
-                    if let Err(error) = term.map_key(event_key, gs.backend()) {
-                        gs.error(error);
-                        self.terminal.take();
-                        gs.toggle_terminal(self);
-                    };
+                if let Some(term) = self.terminal.as_mut()
+                    && let Err(error) = term.map_key(event_key, gs.backend())
+                {
+                    gs.error(error);
+                    self.terminal.take();
+                    gs.toggle_terminal(self);
                 }
             }
         }
