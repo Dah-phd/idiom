@@ -201,12 +201,11 @@ impl From<FileType> for Lang {
                 ],
                 mod_import: vec!["mod", "use"],
                 completion_data_handler: Some(|_lang: &Self, data: Value, gs: &mut GlobalState| {
-                    if let Value::Object(map) = data {
-                        if let Some(Value::Object(import_map)) = map.get("imports").and_then(|arr| arr.get(0)) {
-                            if let Some(Value::String(import)) = import_map.get("full_import_path") {
-                                gs.event.push(IdiomEvent::InsertText(format!("use {import};\n")));
-                            }
-                        };
+                    if let Value::Object(map) = data
+                        && let Some(Value::Object(import_map)) = map.get("imports").and_then(|arr| arr.get(0))
+                        && let Some(Value::String(import)) = import_map.get("full_import_path")
+                    {
+                        gs.event.push(IdiomEvent::InsertText(format!("use {import};\n")));
                     }
                 }),
                 diagnostic_handler: Some(rust_process_related_info),

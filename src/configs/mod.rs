@@ -38,12 +38,12 @@ pub struct EditorKeyMap {
 
 impl EditorKeyMap {
     pub fn map(&self, key: &KeyEvent) -> Option<EditorAction> {
-        if let KeyCode::Char(ch) = key.code {
-            if key.modifiers == KeyModifiers::NONE || key.modifiers == KeyModifiers::SHIFT {
-                return Some(EditorAction::Char(ch));
+        match key {
+            KeyEvent { code: KeyCode::Char(ch), modifiers: KeyModifiers::NONE | KeyModifiers::SHIFT, .. } => {
+                Some(EditorAction::Char(*ch))
             }
+            _ => self.key_map.get(key).copied(),
         }
-        self.key_map.get(key).copied()
     }
 }
 
