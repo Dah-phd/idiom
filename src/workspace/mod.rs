@@ -76,34 +76,7 @@ impl Workspace {
         Mode::map(self, key, gs)
     }
 
-    /// mode handles
-
-    #[inline]
-    pub fn is_toggled_tabs(&self) -> bool {
-        self.mode.is_tab()
-    }
-
-    #[inline]
-    pub fn is_toggled_editor(&self) -> bool {
-        self.mode.is_editor()
-    }
-
-    pub fn toggle_tabs(&mut self) {
-        self.mode.to_tab();
-        self.editors.mark_updated();
-    }
-
-    pub fn toggle_editor(&mut self) {
-        self.mode.to_editor();
-        self.editors.mark_updated();
-    }
-
-    #[inline]
-    pub fn resize_all(&mut self, editor_area: Rect) {
-        for editor in self.editors.iter_mut() {
-            editor.resize(editor_area.width, editor_area.height as usize);
-        }
-    }
+    // GETTERS
 
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -121,6 +94,37 @@ impl Workspace {
     #[inline(always)]
     pub fn get_active(&mut self) -> Option<&mut Editor> {
         self.editors.get_mut_no_update(0)
+    }
+
+    // MODE HANDLES
+
+    #[inline]
+    pub fn is_toggled_tabs(&self) -> bool {
+        self.mode.is_tab()
+    }
+
+    #[inline]
+    pub fn is_toggled_editor(&self) -> bool {
+        self.mode.is_editor()
+    }
+
+    pub fn toggle_tabs(&mut self) {
+        self.mode = Mode::new_tab();
+        self.editors.mark_updated();
+    }
+
+    pub fn toggle_editor(&mut self) {
+        self.mode = Mode::new_editor();
+        self.editors.mark_updated();
+    }
+
+    // EDITOR HANDELS
+
+    #[inline]
+    pub fn resize_all(&mut self, editor_area: Rect) {
+        for editor in self.editors.iter_mut() {
+            editor.resize(editor_area.width, editor_area.height as usize);
+        }
     }
 
     #[inline]

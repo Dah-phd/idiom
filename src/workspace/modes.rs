@@ -35,14 +35,6 @@ impl Mode {
         TAB_MODE
     }
 
-    pub fn to_editor(&mut self) {
-        *self = EDITOR_MODE;
-    }
-
-    pub fn to_tab(&mut self) {
-        *self = TAB_MODE;
-    }
-
     #[inline(always)]
     pub fn map(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         (ws.mode.key_map)(ws, key, gs)
