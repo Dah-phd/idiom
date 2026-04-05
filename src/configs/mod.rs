@@ -140,4 +140,4 @@ fn write_config_file<T: Serialize>(path: &str, configs: &T) -> Option<()> {
 }
 
 #[cfg(test)]
-pub mod test;
+mod test;

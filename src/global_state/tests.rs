@@ -5,7 +5,7 @@ use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
     tree::tests::mock_tree,
-    workspace::tests::mock_ws,
+    workspace::Workspace,
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::{
@@ -15,12 +15,12 @@ use idiom_tui::{
 
 fn full_draw_select(h: u16, w: u16) -> GlobalState {
     let mut gs = GlobalState::new(Rect::new(0, 0, w as usize, h), CrossTerm::init());
-    let mut ws = mock_ws(
+    let mut ws = Workspace::mocked(vec![
         ["test line uno - in here", "second line", "last line for the test"]
             .into_iter()
             .map(ToOwned::to_owned)
             .collect(),
-    );
+    ]);
     let mut tree = mock_tree();
     let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
@@ -34,12 +34,12 @@ fn full_draw_insert(h: u16, w: u16) -> GlobalState {
     let mut gs = GlobalState::new(Rect::new(0, 0, w as usize, h), CrossTerm::init());
     gs.toggle_tree();
     gs.insert_mode();
-    let mut ws = mock_ws(
+    let mut ws = Workspace::mocked(vec![
         ["test line uno - in here", "second line", "last line for the test"]
             .into_iter()
             .map(ToOwned::to_owned)
             .collect(),
-    );
+    ]);
     let mut tree = mock_tree();
     let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
@@ -51,7 +51,7 @@ fn full_draw_insert(h: u16, w: u16) -> GlobalState {
 
 fn force_calc_select(h: u16, w: u16) -> GlobalState {
     let mut gs = GlobalState::new(Rect::new(0, 0, w as usize, h), CrossTerm::init());
-    let mut ws = mock_ws(vec![]);
+    let mut ws = Workspace::mocked(vec![]);
     let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
     assert_eq!(gs.editor_area, Rect::default());
@@ -62,7 +62,7 @@ fn force_calc_select(h: u16, w: u16) -> GlobalState {
 
 fn force_calc_insert(h: u16, w: u16) -> GlobalState {
     let mut gs = GlobalState::new(Rect::new(0, 0, w as usize, h), CrossTerm::init());
-    let mut ws = mock_ws(vec![]);
+    let mut ws = Workspace::mocked(vec![]);
     let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
     assert_eq!(gs.editor_area, Rect::default());

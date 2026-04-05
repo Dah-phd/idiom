@@ -1,6 +1,6 @@
 use super::{Mode, Workspace};
 use crate::{
-    configs::{EditorConfigs, test::mock_editor_key_map},
+    configs::{EditorAction, EditorConfigs, EditorKeyMap},
     cursor::{Cursor, CursorPosition},
     editor::{
         Editor,
@@ -14,37 +14,34 @@ use crate::{
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use idiom_tui::{Backend, layout::Rect};
 
-pub fn mock_ws(content: Vec<String>) -> Workspace {
-    let mut ws = Workspace {
-        editors: vec![mock_editor(content)].into(),
-        base_configs: EditorConfigs::default(),
-        key_map: mock_editor_key_map(),
-        lsp_servers: LSPServers::default(),
-        mode: Mode::new_editor(),
-    };
-    ws.resize_all(Rect::new(0, 0, 90, 60));
-    ws
-}
+impl Workspace {
+    pub fn mocked(editors: Vec<Vec<String>>) -> Self {
+        let data = editors.into_iter().map(mock_editor).collect::<Vec<_>>();
+        let mut ws = Workspace {
+            editors: data.into(),
+            base_configs: EditorConfigs::default(),
+            key_map: EditorKeyMap::mocked(),
+            lsp_servers: LSPServers::default(),
+            mode: Mode::new_editor(),
+        };
+        ws.resize_all(Rect::new(0, 0, 90, 60));
+        ws
+    }
 
-pub fn mock_ws_empty() -> Workspace {
-    Workspace {
-        editors: vec![].into(),
-        base_configs: EditorConfigs::default(),
-        key_map: mock_editor_key_map(),
-        lsp_servers: LSPServers::default(),
-        mode: Mode::new_editor(),
+    pub fn mocked_empty() -> Self {
+        Self::mocked(vec![])
     }
 }
 
 fn base_ws() -> Workspace {
-    mock_ws(vec![
+    Workspace::mocked(vec![vec![
         "hello world!".to_owned(),
         "next line".to_owned(),
         "     ".to_owned(),
         "really long line here".to_owned(),
         "short one here".to_owned(),
         "test msg".to_owned(),
-    ])
+    ]])
 }
 
 fn active(ws: &mut Workspace) -> &mut Editor {
@@ -478,4 +475,20 @@ fn match_content() {
     cursor.match_content(&content);
     assert_eq!(cursor.get_position(), CursorPosition { line: 3, char: 8 });
     assert_eq!(None, cursor.select_get());
+}
+
+#[test]
+fn ws_mode_switches_edgecases() {
+    let mut ws = Workspace::mocked(vec![vec![], vec![]]);
+    let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+    assert!(ws.is_toggled_editor());
+    let cancel = ws.key_map.try_pull(&EditorAction::Cancel).unwrap();
+    let left = ws.key_map.try_pull(&EditorAction::Left).unwrap();
+    assert!(ws.editors.collect_status());
+    assert!(ws.map(&cancel, &mut gs));
+    assert!(ws.editors.collect_status());
+    assert!(ws.is_toggled_tabs());
+    assert!(ws.map(&left, &mut gs));
+    assert!(ws.is_toggled_tabs());
+    assert!(ws.editors.collect_status());
 }

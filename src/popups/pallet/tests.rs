@@ -1,11 +1,7 @@
 use super::formatting::{lowercase, uppercase};
 use crate::{
-    cursor::CursorPosition,
-    embeded_term::EditorTerminal,
-    ext_tui::CrossTerm,
-    global_state::GlobalState,
-    tree::tests::mock_tree,
-    workspace::{Workspace, tests::mock_ws},
+    cursor::CursorPosition, embeded_term::EditorTerminal, ext_tui::CrossTerm, global_state::GlobalState,
+    tree::tests::mock_tree, workspace::Workspace,
 };
 use idiom_tui::{Backend, layout::Rect};
 
@@ -18,17 +14,17 @@ fn uppercase_test() {
     let mut term = EditorTerminal::new(Some("mock".to_owned()));
     let mut tree = mock_tree();
     let mut gs = GlobalState::new(Rect::new(0, 0, 80, 10), CrossTerm::init());
-    let mut ws = mock_ws(vec!["".to_string()]);
+    let mut ws = Workspace::mocked(vec![vec!["".to_string()]]);
     uppercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [""]);
 
-    let mut ws = mock_ws(vec![" test ".to_string()]);
+    let mut ws = Workspace::mocked(vec![vec![" test ".to_string()]]);
     unsafe { ws.get_active().unwrap().cursor_mut().char = 2 };
 
     uppercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" TEST "]);
 
-    let mut ws = mock_ws(vec![" test_part ".to_string()]);
+    let mut ws = Workspace::mocked(vec![vec![" test_part ".to_string()]]);
     unsafe {
         ws.get_active()
             .unwrap()
@@ -38,11 +34,11 @@ fn uppercase_test() {
     uppercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" tesT_Part "]);
 
-    let mut ws = mock_ws(vec![
+    let mut ws = Workspace::mocked(vec![vec![
         " test on mAny lines".to_string(),
         " mOre lInes ".to_string(),
         " morE lines ".to_string(),
-    ]);
+    ]]);
     unsafe {
         ws.get_active()
             .unwrap()
@@ -58,16 +54,16 @@ fn lowercase_test() {
     let mut term = EditorTerminal::new(Some("mock".to_owned()));
     let mut tree = mock_tree();
     let mut gs = GlobalState::new(Rect::new(0, 0, 80, 10), CrossTerm::init());
-    let mut ws = mock_ws(vec!["".to_string()]);
+    let mut ws = Workspace::mocked(vec![vec!["".to_string()]]);
     lowercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [""]);
 
-    let mut ws = mock_ws(vec![" TEST ".to_string()]);
+    let mut ws = Workspace::mocked(vec![vec![" TEST ".to_string()]]);
     unsafe { ws.get_active().unwrap().cursor_mut().char = 2 };
     lowercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" test "]);
 
-    let mut ws = mock_ws(vec![" TEST_PART ".to_string()]);
+    let mut ws = Workspace::mocked(vec![vec![" TEST_PART ".to_string()]]);
     unsafe {
         ws.get_active()
             .unwrap()
@@ -77,11 +73,11 @@ fn lowercase_test() {
     lowercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" TESt_pART "]);
 
-    let mut ws = mock_ws(vec![
+    let mut ws = Workspace::mocked(vec![vec![
         " TEST ON mAny lINES".to_string(),
         " mORE LINEs ".to_string(),
         " MORe lines ".to_string(),
-    ]);
+    ]]);
     unsafe {
         ws.get_active()
             .unwrap()

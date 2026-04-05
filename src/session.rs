@@ -284,19 +284,19 @@ mod tests {
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
     use crate::utils::test::TempDir;
-    use crate::workspace::tests::{mock_ws, mock_ws_empty};
+    use crate::workspace::Workspace;
     use idiom_tui::{Backend, layout::Rect};
     use std::path::PathBuf;
 
     #[test]
     fn store_and_load() {
         let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
-        let mut ws = mock_ws(vec![String::from("test data"), String::from("second line")]);
+        let mut ws = Workspace::mocked(vec![vec![String::from("test data"), String::from("second line")]]);
         let active_editor = ws.get_active().unwrap();
         active_editor.map(crate::configs::EditorAction::Char('a'), &mut gs);
         assert_eq!(active_editor.path(), &PathBuf::from("test-path"));
         assert!(!StoreFileData::from_workspace(&ws).is_empty());
-        let mut receiver_ws = mock_ws_empty();
+        let mut receiver_ws = Workspace::mocked_empty();
         assert!(receiver_ws.is_empty());
         let temp_dir = TempDir::new("session-store").unwrap();
         // store session

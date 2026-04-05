@@ -3,8 +3,27 @@ use assert_enum_variants::assert_enum_variants;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::{collections::HashSet, path::PathBuf};
 
-pub fn mock_editor_key_map() -> EditorKeyMap {
-    EditorKeyMap { key_map: EditorUserKeyMap::default().into() }
+impl EditorKeyMap {
+    pub fn mocked() -> Self {
+        EditorKeyMap { key_map: EditorUserKeyMap::default().into() }
+    }
+
+    pub fn try_pull(&self, action: &EditorAction) -> Option<KeyEvent> {
+        for (k, v) in self.key_map.iter() {
+            if v == action {
+                return Some(k.clone());
+            }
+        }
+        None
+    }
+}
+
+#[test]
+fn editor_key_map_mock_test() {
+    let km = EditorKeyMap::mocked();
+    assert!(km.try_pull(&EditorAction::Cancel).is_some());
+    let second_call = km.try_pull(&EditorAction::Cancel).unwrap();
+    assert_eq!(second_call.code, KeyCode::Esc);
 }
 
 #[test]
@@ -113,7 +132,7 @@ fn family_derive() {
 
 #[test]
 fn test_editor_key_map_char_mapping() {
-    let key_map = mock_editor_key_map();
+    let key_map = EditorKeyMap::mocked();
     let copy = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
     assert_eq!(Some(EditorAction::Copy), key_map.map(&copy));
     let copy2 = KeyEvent::new(KeyCode::Char('C'), KeyModifiers::CONTROL);

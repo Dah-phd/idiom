@@ -66,6 +66,7 @@ impl Workspace {
         }
     }
 
+    #[inline]
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
         if self.editors.collect_status() {
             self.render(gs);
@@ -79,22 +80,24 @@ impl Workspace {
 
     // GETTERS
 
+    #[inline(always)]
+    pub fn get_active(&mut self) -> Option<&mut Editor> {
+        self.editors.get_mut_no_update(0)
+    }
+
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.editors.is_empty()
     }
 
+    #[inline]
     pub fn iter(&self) -> std::slice::Iter<'_, Editor> {
         self.editors.iter()
     }
 
+    #[inline]
     pub fn tabs(&self) -> Vec<String> {
         self.editors.iter().map(|editor| editor.name().to_owned()).collect()
-    }
-
-    #[inline(always)]
-    pub fn get_active(&mut self) -> Option<&mut Editor> {
-        self.editors.get_mut_no_update(0)
     }
 
     // MODE HANDLES
@@ -121,21 +124,18 @@ impl Workspace {
 
     // EDITOR HANDELS
 
-    #[inline]
     pub fn resize_all(&mut self, editor_area: Rect) {
         for editor in self.editors.iter_mut() {
             editor.resize(editor_area.width, editor_area.height as usize);
         }
     }
 
-    #[inline]
     pub fn save_active(&mut self, gs: &mut GlobalState) {
         let Some(editor) = self.get_active() else { return };
         editor.save(gs);
         self.toggle_editor();
     }
 
-    #[inline]
     pub fn rename_editors(&mut self, from_path: PathBuf, to_path: PathBuf, gs: &mut GlobalState) {
         if to_path.is_dir() {
             for editor in self.editors.iter_mut().filter(|e| e.path().starts_with(&from_path)) {
@@ -519,4 +519,4 @@ fn saved_mark(editor: &Editor) -> &str {
 }
 
 #[cfg(test)]
-pub mod tests;
+mod tests;
