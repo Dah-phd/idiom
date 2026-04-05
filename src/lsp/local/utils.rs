@@ -197,10 +197,10 @@ mod test {
 
     use crate::{
         cursor::CursorPosition,
-        lsp::local::{tokens::python::PyToken, LangStream, LocalLSP, PositionedToken},
+        lsp::local::{LangStream, LocalLSP, PositionedToken, tokens::python::PyToken},
     };
 
-    use super::{full_tokens, utf16_encoder, utf8_encoder};
+    use super::{full_tokens, utf8_encoder, utf16_encoder};
     use std::sync::Arc;
 
     #[test]

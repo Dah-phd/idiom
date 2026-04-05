@@ -1,16 +1,16 @@
 use super::{
+    EditorDiagnostics, LSPError, LSPNotification, LSPRequest, LSPResponse, LSPResult, Requests, Responses,
+    TreeDiagnostics,
     local::{build_with_enrichment, create_semantic_capabilities, start_lsp_handler},
     messages::DiagnosticHandle,
     payload::Payload,
-    EditorDiagnostics, LSPError, LSPNotification, LSPRequest, LSPResponse, LSPResult, Requests, Responses,
-    TreeDiagnostics,
 };
 use crate::{configs::FileType, cursor::CursorPosition, utils::split_arc};
 use lsp_types::{
-    notification::{DidCloseTextDocument, DidOpenTextDocument, DidRenameFiles, DidSaveTextDocument, Exit, Initialized},
-    request::Shutdown,
     CompletionOptions, InitializedParams, PositionEncodingKind, Range, ServerCapabilities,
     TextDocumentContentChangeEvent, TextDocumentSyncKind, Uri,
+    notification::{DidCloseTextDocument, DidOpenTextDocument, DidRenameFiles, DidSaveTextDocument, Exit, Initialized},
+    request::Shutdown,
 };
 use std::{
     cell::RefCell,
@@ -20,7 +20,7 @@ use std::{
 };
 use tokio::{
     process::ChildStdin,
-    sync::mpsc::{unbounded_channel, UnboundedSender},
+    sync::mpsc::{UnboundedSender, unbounded_channel},
     task::JoinHandle,
 };
 
@@ -279,7 +279,7 @@ impl MonoID {
 #[cfg(test)]
 mod test {
     use super::{LSPClient, MonoID, Payload};
-    use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+    use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
 
     impl LSPClient {
         pub fn get_receiver(&mut self) -> UnboundedReceiver<Payload> {

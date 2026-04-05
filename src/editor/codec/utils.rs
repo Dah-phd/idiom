@@ -5,8 +5,8 @@ use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::global_state::GlobalState;
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
-    layout::{IterLines, RectIter},
     Backend,
+    layout::{IterLines, RectIter},
 };
 
 pub struct SelectManagerSimple {
@@ -259,11 +259,11 @@ pub fn try_cache_wrap_data_from_lines(
 mod test {
     use super::{super::text, SelectManager, WrapData};
     use crate::cursor::CharRangeUnbound;
-    use crate::editor::{codec::CodecContext, tests::mock_editor_text_render, Editor};
+    use crate::editor::{Editor, codec::CodecContext, tests::mock_editor_text_render};
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
     use crossterm::style::{Color, ContentStyle};
-    use idiom_tui::{layout::Rect, Backend, UTFSafe};
+    use idiom_tui::{Backend, UTFSafe, layout::Rect};
 
     #[test]
     fn test_go_to_index() {

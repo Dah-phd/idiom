@@ -1,5 +1,5 @@
 use super::{
-    apply_multi_cursor_transaction, filter_multi_cursors_per_line_if_no_select, with_new_line_if_not, ControlMap,
+    ControlMap, apply_multi_cursor_transaction, filter_multi_cursors_per_line_if_no_select, with_new_line_if_not,
 };
 use crate::{actions::copy_content, cursor::CursorPosition, editor::Editor};
 use lsp_types::TextEdit;

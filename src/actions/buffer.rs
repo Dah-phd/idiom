@@ -309,7 +309,7 @@ mod tests {
     use crate::actions::buffer::DelBuffer;
     use crate::configs::FileType;
     use crate::cursor::{Cursor, CursorPosition};
-    use crate::editor::syntax::tests::{mock_utf32_lexer, mock_utf8_lexer};
+    use crate::editor::syntax::tests::{mock_utf8_lexer, mock_utf32_lexer};
     use crate::editor_line::EditorLine;
     use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 

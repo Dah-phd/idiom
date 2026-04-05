@@ -13,7 +13,7 @@ use crossterm::{
 use dirs::config_dir;
 pub use editor::{EditorConfigs, IndentConfigs};
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, path::PathBuf};
 pub use theme::Theme;
 pub use theme_ui::UITheme;
@@ -38,12 +38,12 @@ pub struct EditorKeyMap {
 
 impl EditorKeyMap {
     pub fn map(&self, key: &KeyEvent) -> Option<EditorAction> {
-        if let KeyCode::Char(ch) = key.code {
-            if key.modifiers == KeyModifiers::NONE || key.modifiers == KeyModifiers::SHIFT {
-                return Some(EditorAction::Char(ch));
+        match key {
+            KeyEvent { code: KeyCode::Char(ch), modifiers: KeyModifiers::NONE | KeyModifiers::SHIFT, .. } => {
+                Some(EditorAction::Char(*ch))
             }
+            _ => self.key_map.get(key).copied(),
         }
-        self.key_map.get(key).copied()
     }
 }
 
@@ -140,4 +140,4 @@ fn write_config_file<T: Serialize>(path: &str, configs: &T) -> Option<()> {
 }
 
 #[cfg(test)]
-pub mod test;
+mod test;

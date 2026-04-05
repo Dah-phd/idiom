@@ -16,7 +16,7 @@ use clipboard::FileClipboard;
 use crossterm::event::KeyEvent;
 use idiom_tui::Backend;
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     path::{Path, PathBuf},
 };
 pub use tree_paths::TreePath;
@@ -414,7 +414,13 @@ impl Tree {
         let rel_result = (self.path_parser)(path);
         let path = rel_result.as_ref().unwrap_or(path);
 
+        // path outside of tree
         if !path.starts_with(self.inner.path()) {
+            return Ok(());
+        }
+
+        // path is already selected
+        if path == &self.selected_path {
             return Ok(());
         }
 

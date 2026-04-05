@@ -6,8 +6,8 @@ pub mod complex_line;
 pub mod complex_multi_cursor;
 
 use super::{
-    utils::{pad_select, SelectManager},
     CodecContext,
+    utils::{SelectManager, pad_select},
 };
 use crate::global_state::GlobalState;
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
     editor_line::EditorLine,
 };
 use crossterm::style::Stylize;
-use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend};
+use idiom_tui::{Backend, layout::Line, utils::CharLimitedWidths};
 
 const WRAP_OPEN: char = '<';
 const WRAP_CLOSE: char = '>';

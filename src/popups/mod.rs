@@ -26,8 +26,8 @@ use crossterm::{
     event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent},
     style::{Color, ContentStyle},
 };
-pub use generic_popup::{save_and_exit, PopupChoice};
-use idiom_tui::{layout::Rect, Backend};
+pub use generic_popup::{PopupChoice, save_and_exit};
+use idiom_tui::{Backend, layout::Rect};
 
 type InplacePopup = Box<dyn FnMut(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)>;
 

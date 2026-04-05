@@ -191,11 +191,7 @@ impl RenderStatus {
 
     #[inline(always)]
     pub fn skipped_chars(&self) -> usize {
-        if let Self::Cursor { line: _, char: _, skipped_chars, .. } = self {
-            *skipped_chars
-        } else {
-            0
-        }
+        if let Self::Cursor { line: _, char: _, skipped_chars, .. } = self { *skipped_chars } else { 0 }
     }
 }
 

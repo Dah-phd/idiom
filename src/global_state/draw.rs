@@ -3,11 +3,11 @@ use crate::{
     embeded_term::EditorTerminal,
     ext_tui::StyleExt,
     tree::Tree,
-    workspace::{Workspace, TAB_SELECT},
+    workspace::{TAB_SELECT, Workspace},
 };
 use bitflags::bitflags;
 use crossterm::style::ContentStyle;
-use idiom_tui::{layout::Line, Backend};
+use idiom_tui::{Backend, layout::Line};
 
 bitflags! {
     /// Workspace and Footer are always drawn

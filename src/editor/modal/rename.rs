@@ -2,7 +2,7 @@ use super::{ModalAction, ModalMessage};
 use crate::{
     configs::EditorAction,
     cursor::CursorPosition,
-    ext_tui::{text_field::map_action, StyleExt},
+    ext_tui::{StyleExt, text_field::map_action},
     global_state::GlobalState,
 };
 use crossterm::style::ContentStyle;

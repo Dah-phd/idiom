@@ -5,12 +5,12 @@ mod rename;
 use crate::{
     configs::{EditorAction, Theme},
     cursor::{CursorPosition, PositionedWord, WordRange},
-    editor::{syntax::DiagnosticInfo, Editor, EditorLine},
+    editor::{Editor, EditorLine, syntax::DiagnosticInfo},
     global_state::GlobalState,
 };
 use completion::AutoComplete;
 use fuzzy_matcher::skim::SkimMatcherV2;
-use idiom_tui::{layout::Rect, Backend, Position};
+use idiom_tui::{Backend, Position, layout::Rect};
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 use rename::RenameVariable;
@@ -34,11 +34,7 @@ pub enum ModalAction {
 
 impl<T> From<&[T]> for ModalMessage {
     fn from(value: &[T]) -> Self {
-        if value.is_empty() {
-            ModalMessage::Done
-        } else {
-            ModalMessage::default()
-        }
+        if value.is_empty() { ModalMessage::Done } else { ModalMessage::default() }
     }
 }
 

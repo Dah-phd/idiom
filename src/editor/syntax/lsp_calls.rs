@@ -3,12 +3,11 @@ use crate::{
     configs::Theme,
     cursor::CursorPosition,
     editor::{
-        syntax::{
-            set_diganostics,
-            tokens::{set_tokens, set_tokens_partial},
-            Encoding, Lexer,
-        },
         Editor,
+        syntax::{
+            Encoding, Lexer, set_diganostics,
+            tokens::{set_tokens, set_tokens_partial},
+        },
     },
     editor_line::EditorLine,
     global_state::{GlobalState, IdiomEvent},
@@ -32,12 +31,12 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient, theme: &Theme) {
     if let Some(provider) = client.capabilities.completion_provider.as_ref() {
         lexer.autocomplete = get_autocomplete;
         lexer.completable = completable;
-        if let Some(chars) = provider.trigger_characters.as_ref() {
-            if !chars.is_empty() {
-                lexer.lang.compl_trigger_chars.clear();
-                for string in chars {
-                    lexer.lang.compl_trigger_chars.push_str(string);
-                }
+        if let Some(chars) = provider.trigger_characters.as_ref()
+            && !chars.is_empty()
+        {
+            lexer.lang.compl_trigger_chars.clear();
+            for string in chars {
+                lexer.lang.compl_trigger_chars.push_str(string);
             }
         }
     }

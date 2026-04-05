@@ -6,7 +6,7 @@ use crate::{
     global_state::GlobalState,
 };
 use crossterm::style::{Color, ContentStyle};
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{Backend, layout::Rect};
 
 pub fn expect_select(
     mut start_char: usize,

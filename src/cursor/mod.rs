@@ -7,7 +7,7 @@ use lsp_types::Position;
 use serde::{Deserialize, Serialize};
 
 pub use positions::{
-    checked_select, checked_select_with_direction, CharRange, CharRangeUnbound, CursorPosition, Select,
+    CharRange, CharRangeUnbound, CursorPosition, Select, checked_select, checked_select_with_direction,
 };
 pub use word::{EncodedWordRange, PositionedWord, WordRange};
 

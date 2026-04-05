@@ -1,9 +1,29 @@
-use super::{EditorKeyMap, EditorUserKeyMap, FileFamily, FileType};
+use super::{EditorAction, EditorKeyMap, EditorUserKeyMap, FileFamily, FileType};
 use assert_enum_variants::assert_enum_variants;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::{collections::HashSet, path::PathBuf};
 
-pub fn mock_editor_key_map() -> EditorKeyMap {
-    EditorKeyMap { key_map: EditorUserKeyMap::default().into() }
+impl EditorKeyMap {
+    pub fn mocked() -> Self {
+        EditorKeyMap { key_map: EditorUserKeyMap::default().into() }
+    }
+
+    pub fn try_pull(&self, action: &EditorAction) -> Option<KeyEvent> {
+        for (k, v) in self.key_map.iter() {
+            if v == action {
+                return Some(k.clone());
+            }
+        }
+        None
+    }
+}
+
+#[test]
+fn editor_key_map_mock_test() {
+    let km = EditorKeyMap::mocked();
+    assert!(km.try_pull(&EditorAction::Cancel).is_some());
+    let second_call = km.try_pull(&EditorAction::Cancel).unwrap();
+    assert_eq!(second_call.code, KeyCode::Esc);
 }
 
 #[test]
@@ -108,4 +128,44 @@ fn family_derive() {
     cmp_code_derive_filetype_to_filefamily_from_path("test.json", FileType::Json);
     cmp_code_derive_filetype_to_filefamily_from_path("test.sh", FileType::Shell);
     cmp_code_derive_filetype_to_filefamily_from_path(".bashrc", FileType::Shell);
+}
+
+#[test]
+fn test_editor_key_map_char_mapping() {
+    let key_map = EditorKeyMap::mocked();
+    let copy = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
+    assert_eq!(Some(EditorAction::Copy), key_map.map(&copy));
+    let copy2 = KeyEvent::new(KeyCode::Char('C'), KeyModifiers::CONTROL);
+    assert_eq!(Some(EditorAction::Copy), key_map.map(&copy2));
+
+    let c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE);
+    assert_eq!(Some(EditorAction::Char('c')), key_map.map(&c));
+    let c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::SHIFT);
+    assert_eq!(Some(EditorAction::Char('c')), key_map.map(&c));
+    let c = KeyEvent::new(KeyCode::Char('C'), KeyModifiers::NONE);
+    assert_eq!(Some(EditorAction::Char('C')), key_map.map(&c));
+    let c = KeyEvent::new(KeyCode::Char('C'), KeyModifiers::SHIFT);
+    assert_eq!(Some(EditorAction::Char('C')), key_map.map(&c));
+
+    let sline = KeyEvent::new(KeyCode::Char('l'), KeyModifiers::CONTROL);
+    assert_eq!(Some(EditorAction::SelectLine), key_map.map(&sline));
+    let l = KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE);
+    assert_eq!(Some(EditorAction::Char('l')), key_map.map(&l));
+    let l = KeyEvent::new(KeyCode::Char('l'), KeyModifiers::SHIFT);
+    assert_eq!(Some(EditorAction::Char('l')), key_map.map(&l));
+    let l = KeyEvent::new(KeyCode::Char('L'), KeyModifiers::NONE);
+    assert_eq!(Some(EditorAction::Char('L')), key_map.map(&l));
+    let l = KeyEvent::new(KeyCode::Char('L'), KeyModifiers::SHIFT);
+    assert_eq!(Some(EditorAction::Char('L')), key_map.map(&l));
+
+    let noop = KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL);
+    assert_eq!(None, key_map.map(&noop));
+    let l = KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE);
+    assert_eq!(Some(EditorAction::Char('b')), key_map.map(&l));
+    let l = KeyEvent::new(KeyCode::Char('b'), KeyModifiers::SHIFT);
+    assert_eq!(Some(EditorAction::Char('b')), key_map.map(&l));
+    let l = KeyEvent::new(KeyCode::Char('B'), KeyModifiers::NONE);
+    assert_eq!(Some(EditorAction::Char('B')), key_map.map(&l));
+    let l = KeyEvent::new(KeyCode::Char('B'), KeyModifiers::SHIFT);
+    assert_eq!(Some(EditorAction::Char('B')), key_map.map(&l));
 }

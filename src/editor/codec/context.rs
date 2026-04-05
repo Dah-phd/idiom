@@ -4,7 +4,7 @@ use crate::{
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::Position;
-use idiom_tui::{layout::Line, Backend};
+use idiom_tui::{Backend, layout::Line};
 use std::cmp::Ordering;
 
 pub struct CodecContext {
@@ -110,10 +110,11 @@ impl CodecContext {
                 if let Some(pos) = cursor.select_get() {
                     selects.push(pos);
                 }
-            } else if let Some((from, to)) = cursor.select_get() {
-                if from.line <= self.line_number && self.line_number <= to.line {
-                    selects.push((from, to));
-                }
+            } else if let Some((from, to)) = cursor.select_get()
+                && from.line <= self.line_number
+                && self.line_number <= to.line
+            {
+                selects.push((from, to));
             }
             if cursor.line > self.line_number {
                 break;

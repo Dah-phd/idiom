@@ -1,15 +1,15 @@
 use super::lsp_stream::StdErrMessage;
-use crate::editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine};
+use crate::editor::syntax::{DiagnosticLine, tokens::validate_and_format_delta_tokens};
 use lsp_types::{
-    notification::{Notification, PublishDiagnostics},
-    request::GotoDeclarationResponse,
     CompletionItem, CompletionResponse, DiagnosticSeverity, GotoDefinitionResponse, Hover, Location,
     PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, TextEdit, Uri,
     WorkspaceEdit,
+    notification::{Notification, PublishDiagnostics},
+    request::GotoDeclarationResponse,
 };
-use serde_json::{from_value, Result as SerdeResult, Value};
+use serde_json::{Result as SerdeResult, Value, from_value};
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     fmt::Display,
     path::PathBuf,
 };
@@ -41,16 +41,14 @@ impl From<Value> for LSPMessage {
                 });
             }
         }
-        if let Some(method) = obj.get("method") {
-            if method == PublishDiagnostics::METHOD {
-                if let Some(PublishDiagnosticsParams { uri, diagnostics, .. }) = obj
-                    .get_mut("params")
-                    .map(Value::take)
-                    .and_then(|params| from_value::<PublishDiagnosticsParams>(params).ok())
-                {
-                    return LSPMessage::Diagnostic(uri, Diagnostic::new(diagnostics));
-                }
-            }
+        if let Some(method) = obj.get("method")
+            && method == PublishDiagnostics::METHOD
+            && let Some(PublishDiagnosticsParams { uri, diagnostics, .. }) = obj
+                .get_mut("params")
+                .map(Value::take)
+                .and_then(|params| from_value::<PublishDiagnosticsParams>(params).ok())
+        {
+            return LSPMessage::Diagnostic(uri, Diagnostic::new(diagnostics));
         };
         LSPMessage::Unknown(obj)
     }

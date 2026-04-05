@@ -3,12 +3,12 @@ use crate::{
     lsp::{LSPError, LSPNotification, LSPRequest, LSPResponseType},
 };
 use lsp_types::{
+    Range, TextDocumentContentChangeEvent, Uri,
     notification::DidChangeTextDocument,
     request::{
         Completion, Formatting, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename,
         SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
     },
-    Range, TextDocumentContentChangeEvent, Uri,
 };
 
 pub enum Payload {

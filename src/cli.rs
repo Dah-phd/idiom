@@ -10,7 +10,7 @@ use crossterm::{
     event::{Event, KeyCode, KeyEvent},
     style::ContentStyle,
 };
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{Backend, layout::Rect};
 use std::{path::PathBuf, time::Duration};
 
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
@@ -46,7 +46,7 @@ impl Args {
                                 None => {
                                     return Err(IdiomError::io_not_found(format!(
                                         "Unable to derive parent directory of {path:?}!",
-                                    )))
+                                    )));
                                 }
                                 Some(path) => path.to_owned(),
                             };

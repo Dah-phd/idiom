@@ -3,10 +3,10 @@ use crate::editor::syntax::Legend;
 use crate::ext_tui::{StyleExt, StyledLine, Text};
 use idiom_tui::UTFSafe;
 
-use super::create_semantic_capabilities;
 use super::GenericToken;
 use super::LangStream;
 use super::PositionedToken;
+use super::create_semantic_capabilities;
 
 use crossterm::style::ContentStyle;
 

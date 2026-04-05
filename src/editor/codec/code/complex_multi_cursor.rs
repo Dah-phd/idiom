@@ -1,4 +1,4 @@
-use super::{super::CodecContext, width_remainder, WRAP_CLOSE, WRAP_OPEN};
+use super::{super::CodecContext, WRAP_CLOSE, WRAP_OPEN, width_remainder};
 use crate::{
     cursor::{CharRange, CursorPosition},
     editor::syntax::Encoding,
@@ -7,7 +7,7 @@ use crate::{
     global_state::GlobalState,
 };
 use crossterm::style::{ContentStyle, Stylize};
-use idiom_tui::{utils::CharLimitedWidths, Backend};
+use idiom_tui::{Backend, utils::CharLimitedWidths};
 
 pub fn render(
     line: &mut EditorLine,

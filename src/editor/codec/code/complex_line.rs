@@ -1,7 +1,7 @@
 use super::{super::CodecContext, SelectManager, WRAP_CLOSE};
 use crate::{editor::syntax::Encoding, editor_line::EditorLine, ext_tui::CrossTerm, global_state::GlobalState};
 use crossterm::style::{ContentStyle, Stylize};
-use idiom_tui::{utils::CharLimitedWidths, Backend};
+use idiom_tui::{Backend, utils::CharLimitedWidths};
 
 pub fn complex_line(
     code: &EditorLine,

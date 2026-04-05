@@ -1,10 +1,10 @@
 use crate::ext_tui::{
-    pty::{Message, PtyShell, OVERLAY_INFO},
     CrossTerm,
+    pty::{Message, OVERLAY_INFO, PtyShell},
 };
 use crate::global_state::GlobalState;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use idiom_tui::layout::{Line, Rect, BORDERS};
+use idiom_tui::layout::{BORDERS, Line, Rect};
 
 #[derive(Default)]
 pub struct EditorTerminal {
@@ -77,12 +77,12 @@ impl EditorTerminal {
                 CrossTerm::detached_hide_cursor();
             }
             event_key => {
-                if let Some(term) = self.terminal.as_mut() {
-                    if let Err(error) = term.map_key(event_key, gs.backend()) {
-                        gs.error(error);
-                        self.terminal.take();
-                        gs.toggle_terminal(self);
-                    };
+                if let Some(term) = self.terminal.as_mut()
+                    && let Err(error) = term.map_key(event_key, gs.backend())
+                {
+                    gs.error(error);
+                    self.terminal.take();
+                    gs.toggle_terminal(self);
                 }
             }
         }

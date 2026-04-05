@@ -1,8 +1,10 @@
-use crate::configs::{FileType, APP_FOLDER};
-use crate::cursor::Cursor;
-use crate::error::{IdiomError, IdiomResult};
-use crate::global_state::{GlobalState, IdiomEvent};
-use crate::workspace::Workspace;
+use crate::{
+    configs::{APP_FOLDER, FileType},
+    cursor::Cursor,
+    error::{IdiomError, IdiomResult},
+    global_state::GlobalState,
+    workspace::Workspace,
+};
 use dirs::data_local_dir;
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -198,7 +200,7 @@ fn load_session_if_exists(store: PathBuf, ws: &mut Workspace, gs: &mut GlobalSta
         _ = std::fs::remove_dir_all(path);
 
         let Some(editor) = ws.get_active() else { return };
-        gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
+        gs.select_editor_events(editor);
 
         if gs.is_select() {
             gs.insert_mode();
@@ -274,27 +276,27 @@ fn hash_path(path: &Path) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        create_and_store_session, load_session_if_exists, read_last_session_working_dir, LoadedFileData, SessionStatus,
-        StoreFileData,
+        LoadedFileData, SessionStatus, StoreFileData, create_and_store_session, load_session_if_exists,
+        read_last_session_working_dir,
     };
     use crate::configs::FileType;
     use crate::cursor::Cursor;
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
     use crate::utils::test::TempDir;
-    use crate::workspace::tests::{mock_ws, mock_ws_empty};
-    use idiom_tui::{layout::Rect, Backend};
+    use crate::workspace::Workspace;
+    use idiom_tui::{Backend, layout::Rect};
     use std::path::PathBuf;
 
     #[test]
     fn store_and_load() {
         let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
-        let mut ws = mock_ws(vec![String::from("test data"), String::from("second line")]);
+        let mut ws = Workspace::mocked(vec![vec![String::from("test data"), String::from("second line")]]);
         let active_editor = ws.get_active().unwrap();
         active_editor.map(crate::configs::EditorAction::Char('a'), &mut gs);
         assert_eq!(active_editor.path(), &PathBuf::from("test-path"));
         assert!(!StoreFileData::from_workspace(&ws).is_empty());
-        let mut receiver_ws = mock_ws_empty();
+        let mut receiver_ws = Workspace::mocked_empty();
         assert!(receiver_ws.is_empty());
         let temp_dir = TempDir::new("session-store").unwrap();
         // store session

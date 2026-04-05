@@ -1,4 +1,4 @@
-use serde_json::{from_str, Value};
+use serde_json::{Value, from_str};
 use std::{
     fmt::Display,
     num::ParseIntError,

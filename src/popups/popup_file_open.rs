@@ -1,7 +1,7 @@
 use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::map_key, State, StyleExt},
+    ext_tui::{State, StyleExt, text_field::map_key},
     global_state::{GlobalState, IdiomEvent},
     tree::Tree,
     workspace::Workspace,
@@ -9,13 +9,13 @@ use crate::{
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
 use idiom_tui::{
+    Position,
     layout::Rect,
     text_field::{Status as InputStatus, TextField},
-    Position,
 };
 use std::{
     fs::DirEntry,
-    path::{PathBuf, MAIN_SEPARATOR},
+    path::{MAIN_SEPARATOR, PathBuf},
 };
 
 pub struct OpenFileSelector {
@@ -105,15 +105,15 @@ impl Popup for OpenFileSelector {
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
 
-        if self.state.selected != 0 {
-            if let KeyEvent { code: KeyCode::Enter | KeyCode::Tab, .. } = key {
-                let mut text = self.paths.remove(self.state.selected);
-                if PathBuf::from(&text).is_dir() && !text.ends_with(MAIN_SEPARATOR) {
-                    text.push(MAIN_SEPARATOR);
-                }
-                self.pattern.text_set(text);
-                self.solve_comletions();
+        if self.state.selected != 0
+            && let KeyEvent { code: KeyCode::Enter | KeyCode::Tab, .. } = key
+        {
+            let mut text = self.paths.remove(self.state.selected);
+            if PathBuf::from(&text).is_dir() && !text.ends_with(MAIN_SEPARATOR) {
+                text.push(MAIN_SEPARATOR);
             }
+            self.pattern.text_set(text);
+            self.solve_comletions();
         }
         match key {
             KeyEvent { code: KeyCode::Up, .. } => {

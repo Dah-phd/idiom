@@ -3,7 +3,7 @@ use super::ModalMessage;
 use crate::{
     configs::EditorAction, cursor::CursorPosition, editor::syntax::Lang, ext_tui::State, global_state::GlobalState,
 };
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use idiom_tui::layout::{IterLines, Rect};
 use lsp_types::CompletionItem;
 use snippets::parse_completion_item;

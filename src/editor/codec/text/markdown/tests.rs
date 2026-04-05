@@ -4,7 +4,7 @@ use super::{
         md_line,
         tests::drain_as_raw_text_qmark_cursor,
     },
-    ascii_line_exact, complex_line_exact, CodecContext,
+    CodecContext, ascii_line_exact, complex_line_exact,
 };
 use crate::{
     cursor::Cursor,
@@ -16,8 +16,8 @@ use crate::{
 };
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
-    layout::{Borders, IterLines, Rect},
     Backend,
+    layout::{Borders, IterLines, Rect},
 };
 
 fn generate_lines() -> Vec<EditorLine> {

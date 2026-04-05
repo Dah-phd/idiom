@@ -1,4 +1,4 @@
-use super::{diagnostics::DiagnosticData, Legend};
+use super::{Legend, diagnostics::DiagnosticData};
 use crate::{
     cursor::{Cursor, EncodedWordRange},
     editor_line::{EditorLine, RenderStatus},

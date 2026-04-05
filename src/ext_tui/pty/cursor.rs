@@ -1,5 +1,5 @@
 use crate::{cursor::CursorPosition, ext_tui::CrossTerm};
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{Backend, layout::Rect};
 use std::cmp::Ordering;
 use vt100::Screen;
 

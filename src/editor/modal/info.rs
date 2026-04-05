@@ -327,7 +327,7 @@ mod test {
     use crate::editor::syntax::{DiagnosticInfo, Fix};
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
-    use idiom_tui::{layout::Rect, Backend};
+    use idiom_tui::{Backend, layout::Rect};
     use lsp_types::Hover;
 
     #[test]

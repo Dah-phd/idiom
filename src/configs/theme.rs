@@ -1,4 +1,4 @@
-use super::{load_or_create_config, THEME_FILE};
+use super::{THEME_FILE, load_or_create_config};
 use crate::{
     error::IdiomError,
     ext_tui::{pull_color, serialize_rgb},

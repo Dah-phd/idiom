@@ -1,31 +1,31 @@
 use super::{
     create_semantic_capabilities,
+    tokens::PositionedTokenParser,
     tokens::generic::GenericToken,
     tokens::lobster::Pincer,
     tokens::placeholder::PlaceholderToken,
     tokens::python::PyToken,
     tokens::rust::Rustacean,
     tokens::ts::TSToken,
-    tokens::PositionedTokenParser,
-    utils::{full_tokens, partial_tokens, swap_content, utf16_encoder, utf32_encoder, utf8_encoder},
+    utils::{full_tokens, partial_tokens, swap_content, utf8_encoder, utf16_encoder, utf32_encoder},
 };
 use crate::{
     app::ASYNC_RT,
     configs::FileType,
     cursor::CursorPosition,
     lsp::{
+        LSPError, LSPResponse, LSPResponseType, LSPResult, Requests,
         local::{Definitions, LangStream, PositionedToken, Responses},
         payload::Payload,
-        LSPError, LSPResponse, LSPResponseType, LSPResult, Requests,
     },
 };
 use lsp_types::{
-    notification::{DidOpenTextDocument, Notification},
     CompletionOptions, DidOpenTextDocumentParams, PositionEncodingKind, SemanticTokens, SemanticTokensRangeResult,
     SemanticTokensResult, ServerCapabilities, TextDocumentContentChangeEvent, TextDocumentItem,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
+    notification::{DidOpenTextDocument, Notification},
 };
-use serde_json::{from_str, from_value, Value};
+use serde_json::{Value, from_str, from_value};
 use std::{collections::HashMap, sync::Arc};
 use tokio::{io::AsyncWriteExt, process::ChildStdin, sync::mpsc::UnboundedReceiver, task::JoinHandle};
 
@@ -54,7 +54,7 @@ pub fn build_with_enrichment(
                     }
                 }
                 Ok(())
-            })
+            });
         }
     };
     let encoding = capabilities.position_encoding.to_owned();
@@ -486,16 +486,15 @@ mod test {
     use crate::{
         configs::FileType,
         lsp::{
-            as_url,
-            local::{tokens::python::PyToken, LangStream, Payload},
-            LSPNotification, LSPResponse,
+            LSPNotification, LSPResponse, as_url,
+            local::{LangStream, Payload, tokens::python::PyToken},
         },
     };
 
     use super::EnrichedLSP;
     use lsp_types::{
-        notification::DidOpenTextDocument, Position, PositionEncodingKind, Range, SemanticToken,
-        TextDocumentContentChangeEvent, Uri,
+        Position, PositionEncodingKind, Range, SemanticToken, TextDocumentContentChangeEvent, Uri,
+        notification::DidOpenTextDocument,
     };
 
     fn create_lsp<T: LangStream>(text: &str, encoding: Option<PositionEncodingKind>) -> (Uri, EnrichedLSP<T>) {

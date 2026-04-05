@@ -2,7 +2,7 @@ use super::{FileClipboard, Tree, TreePath};
 use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::global_state::GlobalState;
 use crossterm::style::ContentStyle;
-use idiom_tui::{layout::Line, Backend};
+use idiom_tui::{Backend, layout::Line};
 
 const UP: char = '⭡';
 const DOWN: char = '⭣';
@@ -23,20 +23,19 @@ pub fn render_tree(tree: &mut Tree, gs: &mut GlobalState) {
 
     let mut tree_iter = iter.enumerate().skip(tree.state.at_line);
 
-    if tree.state.at_line != 0 {
-        if let Some(mut first) = lines.next() {
-            if let Some((idx, tree_path)) = tree_iter.next() {
-                let style = match idx == tree.state.selected {
-                    true => select_base_style,
-                    false => base_style,
-                };
-                if MIN_ARROW_LINE_WIDTH < first.width {
-                    first.width -= ARROW_WIDTH;
-                    gs.backend.print_styled_at(first.row, first.col + first.width as u16, UP, style);
-                }
-                print_styled_path(tree_path, first, style, tree.display_offset, &tree.tree_clipboard, &mut gs.backend);
-            }
+    if tree.state.at_line != 0
+        && let Some(mut first) = lines.next()
+        && let Some((idx, tree_path)) = tree_iter.next()
+    {
+        let style = match idx == tree.state.selected {
+            true => select_base_style,
+            false => base_style,
+        };
+        if MIN_ARROW_LINE_WIDTH < first.width {
+            first.width -= ARROW_WIDTH;
+            gs.backend.print_styled_at(first.row, first.col + first.width as u16, UP, style);
         }
+        print_styled_path(tree_path, first, style, tree.display_offset, &tree.tree_clipboard, &mut gs.backend);
     }
 
     for (idx, tree_path) in &mut tree_iter {
@@ -69,11 +68,11 @@ fn print_styled_path(
     clipboard: &FileClipboard,
     backend: &mut CrossTerm,
 ) {
-    if let Some(mark) = clipboard.get_mark(tree_path.path()) {
-        if mark.len() + MIN_OFFSET < line.width {
-            line.width -= mark.len();
-            backend.print_styled_at(line.row, line.col + line.width as u16, mark, style);
-        }
+    if let Some(mark) = clipboard.get_mark(tree_path.path())
+        && mark.len() + MIN_OFFSET < line.width
+    {
+        line.width -= mark.len();
+        backend.print_styled_at(line.row, line.col + line.width as u16, mark, style);
     };
     tree_path.render(offset, line, style, backend);
 }

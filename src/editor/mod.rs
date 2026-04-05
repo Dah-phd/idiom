@@ -5,7 +5,7 @@ pub mod syntax;
 mod utils;
 
 use crate::{
-    actions::{find_line_start, Actions},
+    actions::{Actions, find_line_start},
     configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs, ScopeType},
     cursor::{Cursor, CursorPosition},
     editor_line::{EditorLine, LineParser},
@@ -15,7 +15,7 @@ use crate::{
 };
 use codec::TuiCodec;
 use controls::ControlMap;
-use idiom_tui::{layout::Rect, Position};
+use idiom_tui::{Position, layout::Rect};
 use lsp_types::TextEdit;
 pub use modal::EditorModal;
 use std::{
@@ -23,17 +23,18 @@ use std::{
     path::PathBuf,
 };
 use syntax::Lexer;
+pub use utils::{EditorStats, editor_from_data};
 use utils::{
     big_file_protection, build_display, calc_line_number_offset, select_between_chars, select_between_chars_inc,
     select_indent,
 };
-pub use utils::{editor_from_data, EditorStats};
 
 const WARN_TXT: &str = "The file is opened in text mode, \
     beware idiom is not designed with plain text performance in mind!";
 const WARN_MD: &str = "The file is opened in markdown mode, \
     beware idiom is not designed with MD performance in mind!";
 const FILE_UPDATED_VERSION: i32 = -1;
+const BUFFER: i32 = -2;
 
 pub struct Editor {
     saved_version: i32,
@@ -186,12 +187,17 @@ impl Editor {
     }
 
     #[inline]
+    pub fn file_status_is_buffer(&self) -> bool {
+        BUFFER == self.saved_version
+    }
+
+    #[inline]
     pub fn file_status_is_update(&self) -> bool {
         FILE_UPDATED_VERSION == self.saved_version
     }
 
     #[inline]
-    pub fn file_status_mark_updated(&mut self) {
+    pub fn file_status_set_overwritten(&mut self) {
         self.saved_version = FILE_UPDATED_VERSION;
     }
 
@@ -273,6 +279,8 @@ impl Editor {
     }
 
     pub fn try_formatter_and_save(&mut self, gs: &mut GlobalState) -> bool {
+        self.write_file_logged(gs);
+        self.saved_version = self.lexer.file_version();
         self.lexer.try_formatting(self.actions.cfg.indent.len(), true, gs)
     }
 
@@ -449,7 +457,9 @@ impl Editor {
         self.saved_version == self.lexer.file_version()
     }
 
-    pub fn is_saved_check_content(&self) -> IdiomResult<bool> {
+    /// peform content level check to match
+    /// if file is saved - marks it as latest version
+    pub fn is_saved_content_update(&mut self) -> IdiomResult<bool> {
         // for most source code files direct read should be faster
         let file_content = std::fs::read_to_string(&self.path)?;
 
@@ -462,7 +472,13 @@ impl Editor {
                 _ => return Ok(false),
             }
         }
-        Ok(self.content.len() == counter)
+        match self.content.len() == counter {
+            true => {
+                self.saved_version = self.lexer.file_version();
+                Ok(true)
+            }
+            false => Ok(false),
+        }
     }
 
     pub fn rebase(&mut self, gs: &mut GlobalState) {

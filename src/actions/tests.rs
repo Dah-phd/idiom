@@ -1,16 +1,16 @@
 use super::{
+    Actions,
     edits::NewLineResult,
     meta::EditMetaData,
     utils::{clip_content, copy_content, get_closing_char_from_context, insert_clip, remove_content},
-    Actions,
 };
 use crate::actions::Action;
 use crate::actions::Edit;
 use crate::configs::{FileType, IndentConfigs};
 use crate::cursor::{Cursor, CursorPosition};
 use crate::editor::syntax::{
-    tests::{intercept_sync, intercept_sync_rev},
     Encoding, Lexer,
+    tests::{intercept_sync, intercept_sync_rev},
 };
 use crate::editor_line::EditorLine;
 use crate::lsp::LSPResult;
@@ -605,7 +605,10 @@ fn test_clip_content() {
     let from = CursorPosition { line: 4, char: 1 };
     let clip = clip_content(from, CursorPosition { line: 5, char: 15 }, &mut content);
     assert_eq!(&content[4].to_string(), "🚀 everywhere in the end");
-    assert_eq!(&clip, " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀");
+    assert_eq!(
+        &clip,
+        " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀"
+    );
     // within line
     let clip2 = clip_content(from, CursorPosition { line: 4, char: 10 }, &mut content);
     assert_eq!(&content[4].to_string(), "🚀re in the end");
@@ -620,7 +623,10 @@ fn test_clip_content() {
 fn test_copy_content() {
     let content = create_content();
     let clip = copy_content(CursorPosition { line: 4, char: 1 }, CursorPosition { line: 5, char: 15 }, &content);
-    assert_eq!(&clip, " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀");
+    assert_eq!(
+        &clip,
+        " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀"
+    );
     // within line
     let clip2 = copy_content(CursorPosition { line: 5, char: 14 }, CursorPosition { line: 5, char: 15 }, &content);
     assert_eq!(&clip2, "🚀");

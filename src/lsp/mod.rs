@@ -10,7 +10,7 @@ mod request;
 pub mod servers;
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
-pub use local::{init_local_tokens, Highlighter};
+pub use local::{Highlighter, init_local_tokens};
 pub use messages::{Diagnostic, DiagnosticType, EditorDiagnostics, LSPResponse, LSPResponseType, TreeDiagnostics};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;

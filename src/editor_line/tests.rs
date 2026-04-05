@@ -1,11 +1,11 @@
-pub use crate::editor_line::parser::{LineParser, CARRIAGE_NLINE, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE};
+pub use crate::editor_line::parser::{CARRIAGE_NLINE, LineParser, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE};
 use crate::{
     editor::{syntax::Encoding, tests::mock_editor_from_elines},
     editor_line::EditorLine,
     ext_tui::CrossTerm,
     global_state::GlobalState,
 };
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{Backend, layout::Rect};
 use logos::Logos;
 
 #[test]

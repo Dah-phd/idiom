@@ -451,11 +451,11 @@ fn parse_key(keys: &str) -> KeyEvent {
     let mut code = None;
     for key in keys.split("&&") {
         let trimmed = key.trim();
-        if trimmed.len() == 1 {
-            if let Some(ch) = trimmed.chars().next() {
-                code.replace(KeyCode::Char(ch));
-                continue;
-            }
+        if trimmed.len() == 1
+            && let Some(ch) = trimmed.chars().next()
+        {
+            code.replace(KeyCode::Char(ch));
+            continue;
         }
         let trimmed_case_indif = key.trim().to_lowercase();
         match trimmed_case_indif.as_str() {
@@ -486,10 +486,10 @@ fn parse_key(keys: &str) -> KeyEvent {
         }
         if trimmed_case_indif.starts_with(F) {
             let (_, serialized_value) = trimmed_case_indif.split_at(1);
-            if let Ok(f_value) = serialized_value.parse::<u8>() {
-                if f_value <= 12 {
-                    replace_option(&mut code, KeyCode::F(f_value))
-                }
+            if let Ok(f_value) = serialized_value.parse::<u8>()
+                && f_value <= 12
+            {
+                replace_option(&mut code, KeyCode::F(f_value))
             }
         }
     }
@@ -513,24 +513,6 @@ fn replace_option<T>(code: &mut Option<T>, value: T) {
 
 fn split_mod_char_key_event(key: KeyEvent) -> Vec<KeyEvent> {
     let mut events = vec![key];
-    if key.modifiers != KeyModifiers::NONE {
-        if let KeyCode::Char(ch) = key.code {
-            if ch.is_lowercase() {
-                if let Some(new_ch) = ch.to_lowercase().next() {
-                    if ch != new_ch {
-                        events.push(KeyEvent::new(KeyCode::Char(new_ch), key.modifiers))
-                    }
-                }
-            }
-            if ch.is_uppercase() {
-                if let Some(new_ch) = ch.to_uppercase().next() {
-                    if ch != new_ch {
-                        events.push(KeyEvent::new(KeyCode::Char(new_ch), key.modifiers))
-                    }
-                }
-            }
-        }
-    }
     #[cfg(target_os = "linux")]
     match (key.modifiers, key.code) {
         (KeyModifiers::CONTROL, KeyCode::Char(']')) => events.push(KeyEvent::new(KeyCode::Char('5'), key.modifiers)),

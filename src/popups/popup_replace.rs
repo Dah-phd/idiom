@@ -3,7 +3,7 @@ use crate::{
     editor::syntax::Lexer,
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
-    ext_tui::{text_field::map_key, StyleExt},
+    ext_tui::{StyleExt, text_field::map_key},
     global_state::GlobalState,
     tree::Tree,
     workspace::Workspace,
@@ -13,14 +13,14 @@ use crossterm::{
     style::ContentStyle,
 };
 use idiom_tui::{
+    Backend,
     layout::Rect,
     text_field::{Status as InputStatus, TextField},
-    Backend,
 };
 
 use super::{
-    utils::{infer_word_search_positon, next_option, position_with_count_text, prev_option},
     Components, Popup, Status,
+    utils::{infer_word_search_positon, next_option, position_with_count_text, prev_option},
 };
 
 pub struct ReplacePopup {

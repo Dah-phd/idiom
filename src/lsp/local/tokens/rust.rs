@@ -1,5 +1,5 @@
 use super::{
-    Definitions, Func, LangStream, ObjType, PositionedToken, PositionedTokenParser, Struct, Var, NON_TOKEN_ID,
+    Definitions, Func, LangStream, NON_TOKEN_ID, ObjType, PositionedToken, PositionedTokenParser, Struct, Var,
 };
 use logos::{Lexer, Logos};
 

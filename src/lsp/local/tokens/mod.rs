@@ -8,7 +8,7 @@ pub mod rust;
 pub mod ts;
 use crate::{
     configs::{FileType, Theme},
-    editor::syntax::{tokens::set_tokens, Legend},
+    editor::syntax::{Legend, tokens::set_tokens},
     editor_line::EditorLine,
 };
 use idiom_tui::UTFSafe;
@@ -17,7 +17,7 @@ use lsp_types::{CompletionItem, InsertTextFormat, SemanticToken};
 
 use super::{
     create_semantic_capabilities,
-    utils::{full_tokens, NON_TOKEN_ID},
+    utils::{NON_TOKEN_ID, full_tokens},
 };
 use std::{collections::HashSet, fmt::Debug};
 

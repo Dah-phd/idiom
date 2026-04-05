@@ -1,15 +1,16 @@
 use super::{
+    EDITOR_CFG_FILE,
     defaults::{get_indent_after, get_indent_spaces, get_unident_before},
     load_or_create_config,
     types::FileType,
-    write_config_file, EDITOR_CFG_FILE,
+    write_config_file,
 };
 use crate::{
     configs::lsp_cfg::LSPConfig,
     editor_line::EditorLine,
     global_state::GlobalState,
     lsp::servers::InitCfg,
-    utils::{trim_start_inplace, Offset},
+    utils::{Offset, trim_start_inplace},
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -296,10 +297,10 @@ impl IndentConfigs {
 
     pub fn derive_indent_from(&self, prev_line: &EditorLine) -> String {
         let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
-        if let Some(last) = prev_line.trim_end().chars().last() {
-            if self.indent_after.contains(last) {
-                indent.insert_str(0, &self.indent);
-            }
+        if let Some(last) = prev_line.trim_end().chars().last()
+            && self.indent_after.contains(last)
+        {
+            indent.insert_str(0, &self.indent);
         };
         indent
     }

@@ -1,10 +1,9 @@
 use super::super::editor::utils::build_display;
 use super::{
-    calc_line_number_offset,
-    controls::{filter_multi_cursors_per_line_if_no_select, ControlMap},
+    Editor, EditorModal, TuiCodec, calc_line_number_offset,
+    controls::{ControlMap, filter_multi_cursors_per_line_if_no_select},
     syntax::Lexer,
     utils::{select_between_chars, select_between_chars_inc, select_indent},
-    Editor, EditorModal, TuiCodec,
 };
 use crate::{
     actions::Actions,
@@ -14,7 +13,7 @@ use crate::{
     ext_tui::CrossTerm,
     global_state::GlobalState,
 };
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{Backend, layout::Rect};
 use std::path::PathBuf;
 
 impl Editor {
@@ -410,7 +409,7 @@ fn test_stringify() {
 #[test]
 pub fn test_apply_edits_cache_render() {
     use crate::{editor::tests::mock_editor, ext_tui::CrossTerm, global_state::GlobalState};
-    use idiom_tui::{layout::Rect, Backend};
+    use idiom_tui::{Backend, layout::Rect};
 
     let mut gs = GlobalState::new(Rect::new(0, 0, 20, 20), CrossTerm::init());
     gs.force_area_calc();

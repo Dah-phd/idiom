@@ -6,10 +6,10 @@ use lsp_types::DiagnosticRelatedInformation;
 pub fn rust_process_related_info(_lang: &Lang, related_info: &Vec<DiagnosticRelatedInformation>) -> Option<Vec<Fix>> {
     let mut buffer = Vec::new();
     for info in related_info {
-        if info.message.starts_with("consider importing") {
-            if let Some(imports) = rust_derive_import(&info.message) {
-                buffer.extend(imports.into_iter().map(Fix::Import))
-            }
+        if info.message.starts_with("consider importing")
+            && let Some(imports) = rust_derive_import(&info.message)
+        {
+            buffer.extend(imports.into_iter().map(Fix::Import))
         }
     }
     if !buffer.is_empty() {

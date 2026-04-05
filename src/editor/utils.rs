@@ -1,11 +1,11 @@
 use super::{
-    controls::ControlMap, Actions, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily,
-    FileType, GlobalState, Lexer, TuiCodec,
+    Actions, BUFFER, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily, FileType,
+    GlobalState, Lexer, TuiCodec, controls::ControlMap,
 };
 use crate::error::{IdiomError, IdiomResult};
 use std::{
     os::unix::fs::MetadataExt,
-    path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
+    path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR, Path, PathBuf},
 };
 
 #[derive(Debug, PartialEq)]
@@ -18,10 +18,10 @@ pub struct EditorStats {
 pub fn build_display(path: &Path) -> String {
     let mut buffer = Vec::new();
     let mut text_path = path.display().to_string();
-    if let Ok(base_path) = PathBuf::from("./").canonicalize().map(|p| p.display().to_string()) {
-        if text_path.starts_with(&base_path) {
-            text_path.replace_range(..base_path.len(), "");
-        }
+    if let Ok(base_path) = PathBuf::from("./").canonicalize().map(|p| p.display().to_string())
+        && text_path.starts_with(&base_path)
+    {
+        text_path.replace_range(..base_path.len(), "");
     }
     for part in text_path.split(MAIN_SEPARATOR).rev().take(2) {
         buffer.insert(0, part);
@@ -41,11 +41,7 @@ pub fn big_file_protection(path: &Path) -> IdiomResult<()> {
 /// calculates the max digits for line number
 #[inline(always)]
 pub const fn calc_line_number_offset(len: usize) -> usize {
-    if len == 0 {
-        1
-    } else {
-        (len.ilog10() + 1) as usize
-    }
+    if len == 0 { 1 } else { (len.ilog10() + 1) as usize }
 }
 
 pub fn select_indent(editor: &Editor) -> Option<(CursorPosition, CursorPosition)> {
@@ -195,7 +191,7 @@ pub fn editor_from_data(
     let mut editor = Editor {
         actions: Actions::new(cfg.get_indent_cfg(file_type)),
         controls: ControlMap::default(),
-        saved_version: 0,
+        saved_version: BUFFER,
         codec: renderer,
         cursor,
         line_number_padding: line_number_offset,

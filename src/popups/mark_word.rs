@@ -1,8 +1,8 @@
 use crate::{
     configs::ERR,
     cursor::{CursorPosition, EncodedWordRange, PositionedWord},
-    editor::syntax::{tokens::TokenLine, Lexer},
     editor::Editor,
+    editor::syntax::{Lexer, tokens::TokenLine},
     embeded_term::EditorTerminal,
     global_state::GlobalState,
     tree::Tree,
@@ -10,7 +10,7 @@ use crate::{
 };
 use crossterm::{
     self,
-    event::{poll, read, Event, MouseEvent, MouseEventKind},
+    event::{Event, MouseEvent, MouseEventKind, poll, read},
     style::{Attribute, Attributes, ContentStyle},
 };
 use idiom_tui::Backend;
@@ -255,7 +255,7 @@ mod test {
     use crate::{
         configs::FileType,
         cursor::{CursorPosition, EncodedWordRange},
-        editor::syntax::tests::{mock_utf16_lexer, mock_utf8_lexer},
+        editor::syntax::tests::{mock_utf8_lexer, mock_utf16_lexer},
         editor::tests::mock_editor,
         editor_line::EditorLine,
     };

@@ -2,16 +2,16 @@ use super::as_url;
 use crate::{cursor::CursorPosition, lsp::LSPResult};
 use lsp_types::{self as lsp, Uri};
 use lsp_types::{
+    CompletionParams, DocumentFormattingParams, GotoDefinitionParams, HoverParams, Range, ReferenceContext,
+    ReferenceParams, RenameParams, SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpParams,
+    TextDocumentIdentifier, TextDocumentPositionParams, WorkspaceFolder,
     request::{
         Completion, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition, HoverRequest, Initialize,
         References, Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
     },
-    CompletionParams, DocumentFormattingParams, GotoDefinitionParams, HoverParams, Range, ReferenceContext,
-    ReferenceParams, RenameParams, SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpParams,
-    TextDocumentIdentifier, TextDocumentPositionParams, WorkspaceFolder,
 };
 use serde::Serialize;
-use serde_json::{to_string, Value as Jval};
+use serde_json::{Value as Jval, to_string};
 
 #[derive(Serialize, Debug)]
 pub struct LSPRequest<T>
@@ -193,7 +193,7 @@ impl LSPRequest<Initialize> {
     }
 
     pub fn init_request_with_mods(init_cfg: serde_json::Map<String, Jval>) -> LSPResult<LSPRequest<Initialize>> {
-        use serde_json::{map::Entry, Value};
+        use serde_json::{Value, map::Entry};
 
         let uri = as_url(std::env::current_dir()?.as_path());
         let Ok(values) = serde_json::to_value(default_init_params(uri)) else {
@@ -220,7 +220,7 @@ impl LSPRequest<Initialize> {
 }
 
 fn try_merge_values(target: &mut Jval, source: Jval) {
-    use serde_json::{map::Entry, Value as Jval};
+    use serde_json::{Value as Jval, map::Entry};
     if !target.is_object() || !source.is_object() {
         *target = source;
         return;

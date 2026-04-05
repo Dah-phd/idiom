@@ -19,14 +19,14 @@ pub use styler::Highlighter;
 pub use utils::create_semantic_capabilities;
 use utils::{full_tokens, partial_tokens, swap_content};
 
-use super::{payload::Payload, LSPError, LSPResponse, LSPResult, Responses};
+use super::{LSPError, LSPResponse, LSPResult, Responses, payload::Payload};
 use crate::{app::ASYNC_RT, configs::FileType, cursor::CursorPosition};
 
 use lsp_types::{
-    notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
     SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
+    notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
 };
-use serde_json::{from_str, Value};
+use serde_json::{Value, from_str};
 use std::sync::Arc;
 use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle};
 

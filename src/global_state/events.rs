@@ -13,7 +13,7 @@ use crate::popups::popup_tree_search::ActiveFileSearch;
 use crate::popups::{Popup, PopupChoice};
 use crate::tree::Tree;
 use crate::workspace::Workspace;
-use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, Range, WorkspaceEdit};
+use lsp_types::{Location, LocationLink, Range, WorkspaceEdit, request::GotoDeclarationResponse};
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq)]
@@ -56,7 +56,6 @@ pub enum IdiomEvent {
     SetLSP(FileType),
     InsertText(String),
     WorkspaceEdit { edits: WorkspaceEdit, save_active: bool },
-    ActivateEditor(usize),
     SetMode(Mode),
     IdiomCommand,
     Resize { width: u16, height: u16 },
@@ -205,10 +204,10 @@ impl IdiomEvent {
                 ws.check_lsp(file_type, gs);
             }
             IdiomEvent::SetLSP(file_type) => {
-                if let Err(error) = ws.force_lsp_type_on_active(file_type, gs) {
-                    if !matches!(error, crate::error::IdiomError::LSP(crate::lsp::LSPError::Null)) {
-                        gs.error(error);
-                    }
+                if let Err(error) = ws.force_lsp_type_on_active(file_type, gs)
+                    && !matches!(error, crate::error::IdiomError::LSP(crate::lsp::LSPError::Null))
+                {
+                    gs.error(error);
                 };
             }
             IdiomEvent::FileUpdated(path) => {
@@ -218,10 +217,6 @@ impl IdiomEvent {
                 if let Some(editor) = ws.get_active() {
                     editor.insert_text_with_relative_offset(insert);
                 };
-            }
-            IdiomEvent::ActivateEditor(idx) => {
-                ws.activate_editor(idx, gs);
-                gs.insert_mode();
             }
             IdiomEvent::IdiomCommand => {
                 if ws.is_empty() && matches!(gs.mode, Mode::Insert) {

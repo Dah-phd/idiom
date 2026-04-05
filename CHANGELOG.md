@@ -1,4 +1,10 @@
 ## Includes only major changes (manual updates)
+# Version 0.8.1
+- improved mouse handle on workspace tab interaction
+- added check on Tree::select_by_path - if path is already selected no need to do it again
+- added check on file existance if file does not exist so no err msg appears
+- denesting with rust 2024
+
 # Version 0.8.0
 - fix to validate tokens that was causing drop on non-0 delta line and 0 len
 - restructuring editor configs - moving floating LSP's to LSP group

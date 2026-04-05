@@ -2,7 +2,7 @@ use crate::{
     configs::{FileType, Theme},
     editor_line::EditorLine,
 };
-use idiom_tui::{widgets::Writable, UTFSafe};
+use idiom_tui::{UTFSafe, widgets::Writable};
 
 use super::Lang;
 

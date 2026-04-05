@@ -1,15 +1,15 @@
 use super::{
+    Components, Popup, Status,
     generic_selector::PopupSelector,
     popup_replace::ReplacePopup,
     utils::{infer_word_search_positon, next_option, position_with_count_text, prev_option},
-    Components, Popup, Status,
 };
 use crate::{
     cursor::CursorPosition,
     editor::syntax::Lexer,
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
-    ext_tui::{text_field::map_key, StyleExt},
+    ext_tui::{StyleExt, text_field::map_key},
     global_state::GlobalState,
     tree::Tree,
     workspace::Workspace,
@@ -17,9 +17,9 @@ use crate::{
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
 use idiom_tui::{
+    Backend,
     layout::{Line, Rect},
     text_field::{Status as InputStatus, TextField},
-    Backend,
 };
 
 pub struct GoToLinePopup {
@@ -102,10 +102,10 @@ impl Popup for GoToLinePopup {
     }
 
     fn map_mouse(&mut self, event: MouseEvent, _: &mut Components) -> Status {
-        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event {
-            if !self.render_line.contains_position(row, column) {
-                return Status::Finished;
-            }
+        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event
+            && !self.render_line.contains_position(row, column)
+        {
+            return Status::Finished;
         };
         Status::Pending
     }
@@ -152,10 +152,9 @@ impl Popup for FindPopup {
                 *gs.editor_area(),
                 self.accent,
                 self.state,
-            ) {
-                if let Err(error) = popup.main_loop(gs, ws, tree, term) {
-                    gs.error(error);
-                };
+            ) && let Err(error) = popup.main_loop(gs, ws, tree, term)
+            {
+                gs.error(error);
             }
             return Status::Finished;
         }
@@ -262,10 +261,10 @@ impl Popup for FindPopup {
     }
 
     fn map_mouse(&mut self, event: MouseEvent, _: &mut Components) -> Status {
-        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event {
-            if !self.render_line.contains_position(row, column) {
-                return Status::Finished;
-            }
+        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event
+            && !self.render_line.contains_position(row, column)
+        {
+            return Status::Finished;
         };
         Status::Pending
     }

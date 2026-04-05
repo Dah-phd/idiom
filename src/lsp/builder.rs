@@ -2,11 +2,11 @@ use super::error::LSPError;
 use super::lsp_stream::JsonRPC;
 pub use super::messages::{DiagnosticHandle, LSPMessage, LSPResponse, LSPResponseType};
 pub use super::request::LSPRequest;
-use super::{LSPClient, LSPResult, Requests, Responses, LSP};
+use super::{LSP, LSPClient, LSPResult, Requests, Responses};
 use crate::{
     app::ASYNC_RT,
-    configs::{get_config_dir, FileType},
-    utils::{split_arc, SHELL},
+    configs::{FileType, get_config_dir},
+    utils::{SHELL, split_arc},
 };
 use lsp_types::{InitializeResult, ServerCapabilities};
 use serde_json::from_value;
