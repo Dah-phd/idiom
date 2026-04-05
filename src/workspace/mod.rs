@@ -72,6 +72,7 @@ impl Workspace {
         }
     }
 
+    #[inline(always)]
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         Mode::map(self, key, gs)
     }

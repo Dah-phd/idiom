@@ -30,7 +30,6 @@ impl Mode {
         EDITOR_MODE
     }
 
-    #[allow(dead_code)]
     pub const fn new_tab() -> Self {
         TAB_MODE
     }
@@ -40,7 +39,7 @@ impl Mode {
         (ws.mode.key_map)(ws, key, gs)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn style(&self) -> ContentStyle {
         self.style
     }
