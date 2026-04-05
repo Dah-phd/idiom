@@ -149,7 +149,7 @@ pub fn mouse_handler(
             } else if let Some(position) = gs.tab_area.relative_position(event.row, event.column) {
                 if !ws.is_empty() {
                     let pos_char = position.col as usize;
-                    if ws.is_close_tab_mouse(pos_char, gs) && gs.is_insert() {
+                    if ws.is_close_tab_mouse(pos_char, gs) && gs.is_insert() && ws.is_toggled_editor() {
                         ws.toggle_tabs();
                     }
                 }
