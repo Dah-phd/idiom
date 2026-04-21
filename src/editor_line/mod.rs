@@ -1,6 +1,6 @@
 mod parser;
 mod status;
-pub use parser::{LineEnd, LineParser, POSIX_NLINE};
+pub use parser::{CARRIAGE_NLINE, LineEnd, LineParser, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE};
 pub use status::{Reduction, RenderStatus};
 
 use crate::{
@@ -141,6 +141,12 @@ impl EditorLine {
             return self.content.get(..to);
         }
         self.content.get_to_char(to)
+    }
+
+    #[inline]
+    pub fn set_line_end(&mut self, line_end: LineEnd) {
+        self.line_end = line_end;
+        self.cached.reset();
     }
 
     #[inline]

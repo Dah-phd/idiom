@@ -7,6 +7,7 @@ pub mod popup_file_open;
 pub mod popup_find;
 pub mod popup_lsp_select;
 pub mod popup_replace;
+pub mod popup_set_newline;
 pub mod popup_tree_search;
 pub mod popups_editor;
 pub mod popups_tree;

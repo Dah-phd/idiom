@@ -1,4 +1,7 @@
 ## Includes only major changes (manual updates)
+# Version 0.8.2
+- added popup in pallet to select different line end (on current selected line)
+
 # Version 0.8.1
 - improved mouse handle on workspace tab interaction
 - added check on Tree::select_by_path - if path is already selected no need to do it again

@@ -8,7 +8,7 @@ use crate::{
     actions::{Actions, find_line_start},
     configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs, ScopeType},
     cursor::{Cursor, CursorPosition},
-    editor_line::{EditorLine, LineParser},
+    editor_line::{EditorLine, LineEnd, LineParser},
     error::IdiomResult,
     global_state::GlobalState,
     lsp::{LSPClient, LSPError},
@@ -616,11 +616,16 @@ impl Editor {
     }
 
     #[inline(always)]
+    pub fn cut(&mut self) -> Option<String> {
+        (self.controls.cut)(self)
+    }
+
+    #[inline(always)]
     pub fn copy(&mut self) -> Option<String> {
         (self.controls.copy)(self)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn paste(&mut self, clip: String, gs: &mut GlobalState) {
         let (taken, modal_rect) = self.modal.paste_if_exists(&clip);
         if let Some(rect) = modal_rect {
@@ -630,6 +635,14 @@ impl Editor {
             return;
         }
         (self.controls.paste)(self, clip)
+    }
+
+    #[inline]
+    pub fn set_line_end(&mut self, line_end: LineEnd) {
+        let Some(eline) = self.content.get_mut(self.cursor.line) else {
+            return;
+        };
+        eline.set_line_end(line_end);
     }
 
     // MOUSE
