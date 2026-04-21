@@ -645,6 +645,21 @@ impl Editor {
         eline.set_line_end(line_end);
     }
 
+    #[inline]
+    pub fn strip_control_chars(&mut self, gs: &mut GlobalState) {
+        let stripped = self.content.iter_mut().map(|eline| eline.stripped_control_chars()).sum::<usize>();
+        if stripped == 0 {
+            gs.success("No control chars found ...");
+            return;
+        }
+        gs.success(format!("Stripped {} control chars.", stripped));
+        self.codec.clear_cache();
+        self.actions.clear();
+        if let Err(error) = self.lexer.reopen(self.stringify(), self.file_type, gs) {
+            gs.error(error);
+        };
+    }
+
     // MOUSE
 
     pub fn mouse_scroll_up(&mut self, select: bool, gs: &mut GlobalState) {

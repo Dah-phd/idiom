@@ -353,8 +353,9 @@ impl Lexer {
         if !self.lsp {
             return Ok(());
         };
+        self.client.file_did_open(self.uri.clone(), file_type, content)?;
         (self.tokens)(self, gs);
-        self.client.file_did_open(self.uri.clone(), file_type, content)
+        Ok(())
     }
 
     pub fn close(&mut self) {

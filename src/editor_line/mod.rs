@@ -149,6 +149,23 @@ impl EditorLine {
         self.cached.reset();
     }
 
+    pub fn stripped_control_chars(&mut self) -> usize {
+        self.line_end = POSIX_NLINE;
+        let mut stripped = 0;
+        self.content.retain(|c| {
+            if c.is_control() {
+                stripped += 1;
+                // do not retain control chars
+                return false;
+            };
+            true
+        });
+        if stripped != 0 {
+            self.char_len = self.content.char_len();
+        }
+        stripped
+    }
+
     #[inline]
     pub fn replace_till(&mut self, to: usize, string: &str) {
         self.cached.reset();

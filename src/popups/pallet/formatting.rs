@@ -26,6 +26,11 @@ pub fn lowercase(_gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _t
     });
 }
 
+pub fn strip_control_chars(gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
+    let Some(editor) = ws.get_active() else { return };
+    editor.strip_control_chars(gs);
+}
+
 pub fn select_line_ending(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
     crate::popups::popup_set_newline::SetCustomNewLine::run(gs, ws, tree, term);
 }
