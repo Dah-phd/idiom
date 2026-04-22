@@ -16,14 +16,25 @@ pub const MSDOS_NLINE: LineEnd = LineEnd { text: "\r\n", char: '⇆' };
 pub const RISCOS_NLINE: LineEnd = LineEnd { text: "\n\r", char: '⇄' };
 pub const POSIX_NLINE: LineEnd = LineEnd { text: "\n", char: ' ' };
 pub const CARRIAGE_NLINE: LineEnd = LineEnd { text: "\r", char: '←' };
+pub const VERTICAL_TAB: LineEnd = LineEnd { text: "\u{000B}", char: '⭣' };
+pub const FROM_FEED: LineEnd = LineEnd { text: "\u{000C}", char: '▸' };
+pub const FILE_END: LineEnd = LineEnd { text: "\u{001C}", char: '◂' };
+pub const RECORD_END: LineEnd = LineEnd { text: "\u{001E}", char: '®' };
+
+// RESTRICTED CONTROL CHARS
+// they can cause probles with rendering in terminal
+
+const BACKSPACE: char = '\u{0008}';
+const ESC: char = '\u{001B}';
 
 #[derive(Debug, Default)]
 pub struct ParsedLines<'a> {
     content: Vec<(&'a str, LineEnd)>,
     tabs: Vec<usize>,
-    msdos: bool,
-    risc_os: bool,
-    carriage: bool,
+    /// anything below is unlikely to happen
+    non_posix_line_ends: bool,
+    replaced_esc_cc: Vec<usize>,
+    replaced_backspaces_cc: Vec<usize>,
 }
 
 impl ParsedLines<'_> {
@@ -39,28 +50,69 @@ impl ParsedLines<'_> {
     }
 
     pub fn into_editor_lines(self) -> Vec<EditorLine> {
-        self.content.into_iter().map(|(content, line_end)| EditorLine::new(content.into(), line_end)).collect()
+        self.transform_to_editor_lines(|text, line_end| EditorLine::new(text, line_end))
+    }
+
+    pub fn into_sanitzed_editor_lines(mut self, cfg: &IndentConfigs) -> Vec<EditorLine> {
+        if self.tabs.is_empty() {
+            return self.transform_to_editor_lines(|text, _| EditorLine::new_posix(text));
+        }
+        let tabs = std::mem::take(&mut self.tabs);
+        let mut idx = 0;
+        self.transform_to_editor_lines(|mut text, _| {
+            if tabs.contains(&idx) {
+                text = text.replace('\t', cfg.indent.as_str());
+            }
+            idx += 1;
+            EditorLine::new_posix(text)
+        })
     }
 
     pub fn is_formatted(&self) -> bool {
-        self.tabs.is_empty() && !self.msdos && !self.risc_os && !self.carriage
+        self.tabs.is_empty() && !self.non_posix_line_ends
     }
 
-    pub fn into_sanitzed_editor_lines(self, cfg: &IndentConfigs) -> Vec<EditorLine> {
-        let ParsedLines { content, tabs, .. } = self;
-        if tabs.is_empty() {
-            content.into_iter().map(|(content, ..)| EditorLine::new_posix(content.into())).collect()
-        } else {
-            let size = std::mem::size_of::<EditorLine>();
-            let mut lines = Vec::with_capacity(content.len() * size);
-            for (line_idx, (text, ..)) in content.into_iter().enumerate() {
-                let text = match tabs.contains(&line_idx) {
-                    true => text.replace('\t', cfg.indent.as_str()),
-                    false => text.to_owned(),
-                };
-                lines.push(EditorLine::new_posix(text));
-            }
-            lines
+    /// ensures that no restricted control chars are present
+    fn transform_to_editor_lines(self, mut cb: impl FnMut(String, LineEnd) -> EditorLine) -> Vec<EditorLine> {
+        let ParsedLines { content, replaced_esc_cc, replaced_backspaces_cc, .. } = self;
+        match (replaced_esc_cc.is_empty(), replaced_backspaces_cc.is_empty()) {
+            (true, true) => content.into_iter().map(|(text, end)| (cb)(text.into(), end)).collect(),
+            (true, false) => content
+                .into_iter()
+                .enumerate()
+                .map(|(idx, (text, end))| {
+                    let mut text = text.to_owned();
+                    if replaced_backspaces_cc.contains(&idx) {
+                        text.retain(|c| c != BACKSPACE);
+                    };
+                    (cb)(text, end)
+                })
+                .collect(),
+            (false, true) => content
+                .into_iter()
+                .enumerate()
+                .map(|(idx, (text, end))| {
+                    let mut text = text.to_owned();
+                    if replaced_esc_cc.contains(&idx) {
+                        text.retain(|c| c != ESC);
+                    };
+                    (cb)(text, end)
+                })
+                .collect(),
+            (false, false) => content
+                .into_iter()
+                .enumerate()
+                .map(|(idx, (text, end))| {
+                    let mut text = text.to_owned();
+                    match (replaced_esc_cc.contains(&idx), replaced_backspaces_cc.contains(&idx)) {
+                        (true, true) => text.retain(|c| c != ESC && c != BACKSPACE),
+                        (false, true) => text.retain(|c| c != BACKSPACE),
+                        (true, false) => text.retain(|c| c != ESC),
+                        (false, false) => (),
+                    };
+                    (cb)(text, end)
+                })
+                .collect(),
         }
     }
 
@@ -105,10 +157,10 @@ impl ParsedLines<'_> {
 
     fn render_popup(&self, choice: usize, gs: &mut GlobalState) {
         use crate::ext_tui::StyleExt;
-        use crossterm::style::ContentStyle;
+        use crossterm::style::{Color, ContentStyle};
         use idiom_tui::Backend;
 
-        let mut lines = gs.editor_area().modal_relative(2, 2, 60, 10).into_iter();
+        let mut lines = gs.editor_area().modal_relative(2, 2, 60, 12).into_iter();
         let Some(line) = lines.next() else { return };
         line.render_styled("Found unexpected formatting:", ContentStyle::bold(), gs.backend());
         let Some(line) = lines.next() else { return };
@@ -121,25 +173,9 @@ impl ParsedLines<'_> {
             ),
         };
         let Some(line) = lines.next() else { return };
-        match self.msdos {
-            true => {
-                line.render_styled("    Used MS DOS line end (\\r\\n): present!", ContentStyle::bold(), gs.backend())
-            }
-            false => line.render("    Used MS DOS line end (\\r\\n): N/A", gs.backend()),
-        };
-        let Some(line) = lines.next() else { return };
-        match self.risc_os {
-            true => {
-                line.render_styled("    Used Risc OS line end (\\n\\r): present!", ContentStyle::bold(), gs.backend())
-            }
-            false => line.render("    Used Risc OS line end (\\n\\r): N/A", gs.backend()),
-        };
-        let Some(line) = lines.next() else { return };
-        match self.carriage {
-            true => {
-                line.render_styled("    Used CARRIAGE line end (\\r): present!", ContentStyle::bold(), gs.backend())
-            }
-            false => line.render("    Used CARRIAGE line end (\\r): N/A", gs.backend()),
+        match self.non_posix_line_ends {
+            true => line.render_styled("    Used non posix line ends: present!", ContentStyle::bold(), gs.backend()),
+            false => line.render("    Used non posix line ends: N/A", gs.backend()),
         };
         let Some(line) = lines.next() else { return };
         line.render_styled("Handle choices:", ContentStyle::bold(), gs.backend());
@@ -154,13 +190,29 @@ impl ParsedLines<'_> {
                 }
             }
         }
+        if !self.replaced_esc_cc.is_empty() {
+            let Some(line) = lines.next() else { return };
+            line.render_styled(
+                "Found U+001B ESC Control char -> will be stripped from text!",
+                ContentStyle::bold().with_fg(Color::Red),
+                gs.backend(),
+            );
+        }
+        if !self.replaced_backspaces_cc.is_empty() {
+            let Some(line) = lines.next() else { return };
+            line.render_styled(
+                "Found U+0008 BACKSPACE Control char -> will be stripped from text!",
+                ContentStyle::bold().with_fg(Color::Red),
+                gs.backend(),
+            );
+        }
         gs.backend().flush_buf();
     }
 }
 
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Debug, Logos, PartialEq)]
-#[logos(skip r#"[^\r\n\t]"#)]
+#[logos(skip r#"[^\r\n\t\u{0008}\u{001B}\u{000B}\u{000C}\u{001C}\u{001E}]"#)]
 pub enum LineParser {
     #[token("\r\n")]
     MSDOS_NEWLINE,
@@ -170,8 +222,22 @@ pub enum LineParser {
     POSIX_NEWLINE,
     #[token("\r")]
     CARRIAGE_NEWLINE,
+    #[token("\u{000B}")]
+    VERTICAL_TAB,
+    #[token("\u{000C}")]
+    FROM_FEED,
+    #[token("\u{001C}")]
+    FILE_END,
+    #[token("\u{001E}")]
+    RECORD_END,
+
     #[token("\t")]
     TAB,
+
+    #[token("\u{0008}")]
+    BACKSPACE_CC,
+    #[token("\u{001B}")]
+    ESC_CC,
 }
 
 impl LineParser {
@@ -189,27 +255,56 @@ impl LineParser {
                     results.tabs.push(line);
                     continue;
                 }
+                Ok(Self::ESC_CC) => {
+                    results.replaced_esc_cc.push(line);
+                    continue;
+                }
+                Ok(Self::BACKSPACE_CC) => {
+                    results.replaced_backspaces_cc.push(line);
+                    continue;
+                }
+                Ok(Self::VERTICAL_TAB) => {
+                    results.non_posix_line_ends = true;
+                    VERTICAL_TAB
+                }
+                Ok(Self::FROM_FEED) => {
+                    results.non_posix_line_ends = true;
+                    FROM_FEED
+                }
+                Ok(Self::FILE_END) => {
+                    results.non_posix_line_ends = true;
+                    FILE_END
+                }
+                Ok(Self::RECORD_END) => {
+                    results.non_posix_line_ends = true;
+                    RECORD_END
+                }
                 Ok(Self::POSIX_NEWLINE) => POSIX_NLINE,
                 Ok(Self::MSDOS_NEWLINE) => {
-                    results.msdos = true;
+                    results.non_posix_line_ends = true;
                     MSDOS_NLINE
                 }
                 Ok(Self::RISCOS_NEWLINE) => {
-                    results.risc_os = true;
+                    results.non_posix_line_ends = true;
                     RISCOS_NLINE
                 }
                 Ok(Self::CARRIAGE_NEWLINE) => {
-                    results.carriage = true;
+                    results.non_posix_line_ends = true;
                     CARRIAGE_NLINE
                 }
             };
 
             let line_end_span = lines.span();
-            results.content.push((&text[start..line_end_span.start], line_end));
+            let text_line = &text[start..line_end_span.start];
+            results.content.push((text_line, line_end));
             start = line_end_span.end;
             line += 1;
         }
         results.content.push((&text[start..], POSIX_NLINE));
         results
+    }
+
+    pub fn sanitize_text(text: &str) -> String {
+        todo!()
     }
 }

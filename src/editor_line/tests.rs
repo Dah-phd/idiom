@@ -1,5 +1,8 @@
-pub use crate::editor_line::parser::{CARRIAGE_NLINE, LineParser, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE};
+pub use crate::editor_line::parser::{
+    CARRIAGE_NLINE, FILE_END, FROM_FEED, LineParser, MSDOS_NLINE, POSIX_NLINE, RECORD_END, RISCOS_NLINE, VERTICAL_TAB,
+};
 use crate::{
+    configs::IndentConfigs,
     editor::{syntax::Encoding, tests::mock_editor_from_elines},
     editor_line::EditorLine,
     ext_tui::CrossTerm,
@@ -256,7 +259,7 @@ fn test_split_off_ascii() {
 
 #[test]
 fn test_parse() {
-    let text = "a💀w\ndawda\radaw\r\nwas\n_💀_\n\r+++";
+    let text = "a💀w\ndawda\radaw\r\nwas\n_💀_\n\r+++\nada\u{001E}ae\u{001C}ddd\u{000C}awes\u{000B}aw";
     let content = LineParser::split_lines(text).into_editor_lines();
     let expect = [
         EditorLine::new("a💀w".into(), POSIX_NLINE),
@@ -265,6 +268,11 @@ fn test_parse() {
         EditorLine::new("was".into(), POSIX_NLINE),
         EditorLine::new("_💀_".into(), RISCOS_NLINE),
         EditorLine::new("+++".into(), POSIX_NLINE),
+        EditorLine::new("ada".into(), RECORD_END),
+        EditorLine::new("ae".into(), FILE_END),
+        EditorLine::new("ddd".into(), FROM_FEED),
+        EditorLine::new("awes".into(), VERTICAL_TAB),
+        EditorLine::new("aw".into(), POSIX_NLINE),
     ];
     assert_eq!(content.len(), expect.len());
     for (real, expect) in content.iter().zip(expect.iter()) {
@@ -275,7 +283,7 @@ fn test_parse() {
 
 #[test]
 fn parser_stable() {
-    let data = "asd\n\tasdawdaw\n\radwadawdawda\r\nadawdadwd\radwa";
+    let data = "asd\n\tdaw\n\radwda\r\nadwd\rada\u{001E}ae\u{001C}ddd\u{000C}awes\u{000B}awdwe";
     let tokens = LineParser::lexer(data);
     assert_eq!(
         tokens.collect::<Vec<_>>(),
@@ -284,14 +292,18 @@ fn parser_stable() {
             Ok(LineParser::TAB),
             Ok(LineParser::RISCOS_NEWLINE),
             Ok(LineParser::MSDOS_NEWLINE),
-            Ok(LineParser::CARRIAGE_NEWLINE)
+            Ok(LineParser::CARRIAGE_NEWLINE),
+            Ok(LineParser::RECORD_END),
+            Ok(LineParser::FILE_END),
+            Ok(LineParser::FROM_FEED),
+            Ok(LineParser::VERTICAL_TAB),
         ],
     );
 }
 
 #[test]
 fn test_render_line_ends() {
-    let data = "aaa\rbbb\r\nccc\n\rddd";
+    let data = "aaa\rbbb\r\nccc\n\rddd\u{001E}ae\u{001C}ddd\u{000C}awes\u{000B}awdwe";
     let parsed = LineParser::split_lines(&data);
     let mut editor = mock_editor_from_elines(parsed.into_editor_lines());
     let mut gs = GlobalState::new(Rect::new(0, 0, 40, 5), CrossTerm::init());
@@ -332,4 +344,78 @@ fn test_render_line_ends() {
         "c", "c", "c", "⇄", "<<reset style>>", "<<reset style>>",
         "<<go to row: 3 col: 15>>", "4 ", "<<clear EOL>>", "ddd",
     ]);
+
+    editor.go_to(3);
+    editor.render(&mut gs);
+    let drain = gs.backend().drain();
+
+    #[rustfmt::skip]
+    assert_eq!(drain.iter().map(|(_, txt)| txt.as_str()).collect::<Vec<_>>(), [
+        "<<go to row: 1 col: 15>>", "3 ", "<<clear EOL>>", "ccc",
+        "<<go to row: 2 col: 15>>", "4 ", "<<clear EOL>>", "<<reset style>>",
+        "d", "d", "d", "®", "<<reset style>>", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "5 ", "<<clear EOL>>", "ae"
+    ]);
+
+    editor.go_to(4);
+    editor.render(&mut gs);
+    let drain = gs.backend().drain();
+
+    #[rustfmt::skip]
+    assert_eq!(drain.iter().map(|(_, txt)| txt.as_str()).collect::<Vec<_>>(), [
+        "<<go to row: 1 col: 15>>", "4 ", "<<clear EOL>>", "ddd",
+        "<<go to row: 2 col: 15>>", "5 ", "<<clear EOL>>", "<<reset style>>",
+        "a", "e", "◂", "<<reset style>>", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "6 ", "<<clear EOL>>", "ddd"
+    ]);
+
+    editor.go_to(5);
+    editor.render(&mut gs);
+    let drain = gs.backend().drain();
+
+    #[rustfmt::skip]
+    assert_eq!(drain.iter().map(|(_, txt)| txt.as_str()).collect::<Vec<_>>(), [
+        "<<go to row: 1 col: 15>>", "5 ", "<<clear EOL>>", "ae",
+        "<<go to row: 2 col: 15>>", "6 ", "<<clear EOL>>", "<<reset style>>",
+        "d", "d", "d", "▸", "<<reset style>>", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "7 ", "<<clear EOL>>", "awes"
+    ]);
+
+    editor.go_to(6);
+    editor.render(&mut gs);
+    let drain = gs.backend().drain();
+
+    #[rustfmt::skip]
+    assert_eq!(drain.iter().map(|(_, txt)| txt.as_str()).collect::<Vec<_>>(), [
+        "<<go to row: 1 col: 15>>", "6 ", "<<clear EOL>>", "ddd",
+        "<<go to row: 2 col: 15>>", "7 ", "<<clear EOL>>", "<<reset style>>",
+        "a", "w", "e", "s", "⭣", "<<reset style>>", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "8 ", "<<clear EOL>>", "awdwe"
+    ]);
+}
+
+#[test]
+fn test_stripped_restricted_control_chars() {
+    let cfg = IndentConfigs::default();
+    let text = "aaa\r\tb\u{001B}\u{0008}bb\r\ncc\u{0008}c\n\rddd\u{001E}ae\u{001C}d\u{001B}dd\u{000C}awe\u{0008}s\u{000B}awd\u{001B}we";
+    assert_eq!(
+        LineParser::split_lines(text).into_editor_lines().into_iter().map(|eline| eline.unwrap()).collect::<Vec<_>>(),
+        ["aaa", "\tbbb", "ccc", "ddd", "ae", "ddd", "awes", "awdwe"],
+    );
+    assert_eq!(
+        LineParser::split_lines(text)
+            .into_sanitzed_editor_lines(&cfg)
+            .into_iter()
+            .map(|eline| eline.unwrap())
+            .collect::<Vec<_>>(),
+        ["aaa", "    bbb", "ccc", "ddd", "ae", "ddd", "awes", "awdwe"],
+    )
+}
+
+#[test]
+fn test_sanitize_text() {
+    let result = LineParser::sanitize_text(
+        "tesea\na\u{001B}\u{0008}dwa\r\nad\u{001B}wadw\u{000C}aw\u{0008}e\ts\u{000B}a\u{0008}wd\u{001B}we\r\nda\n\ra",
+    );
+    assert_eq!(result, "tesea\nadwa\nadwadw\nawes\nawdwe\nda\na");
 }
