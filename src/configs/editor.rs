@@ -211,6 +211,11 @@ impl EditorConfigs {
         Ok(configs)
     }
 
+    #[inline]
+    pub fn indent(&self) -> String {
+        (0..self.indent_spaces).map(|_| ' ').collect()
+    }
+
     pub fn get_indent_cfg(&self, file_type: FileType) -> IndentConfigs {
         let indent_cfg = self.default_indent_cfg();
         indent_cfg.update_by_file_type(file_type)
@@ -218,7 +223,7 @@ impl EditorConfigs {
 
     pub fn default_indent_cfg(&self) -> IndentConfigs {
         IndentConfigs {
-            indent: (0..self.indent_spaces).map(|_| ' ').collect(),
+            indent: self.indent(),
             indent_after: self.indent_after.to_owned(),
             unindent_before: self.unindent_before.to_owned(),
         }

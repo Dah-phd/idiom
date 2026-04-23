@@ -404,7 +404,7 @@ fn test_stripped_restricted_control_chars() {
     );
     assert_eq!(
         LineParser::split_lines(text)
-            .into_sanitzed_editor_lines(&cfg)
+            .into_sanitzed_editor_lines(&cfg.indent)
             .into_iter()
             .map(|eline| eline.unwrap())
             .collect::<Vec<_>>(),
@@ -414,8 +414,10 @@ fn test_stripped_restricted_control_chars() {
 
 #[test]
 fn test_sanitize_text() {
+    let indent_cfg = IndentConfigs::default();
     let result = LineParser::sanitize_text(
         "tesea\na\u{001B}\u{0008}dwa\r\nad\u{001B}wadw\u{000C}aw\u{0008}e\ts\u{000B}a\u{0008}wd\u{001B}we\r\nda\n\ra",
+        indent_cfg.indent.as_str(),
     );
-    assert_eq!(result, "tesea\nadwa\nadwadw\nawes\nawdwe\nda\na");
+    assert_eq!(result, "tesea\nadwa\nadwadw\nawe    s\nawdwe\nda\na");
 }

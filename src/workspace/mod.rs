@@ -100,6 +100,11 @@ impl Workspace {
         self.editors.iter().map(|editor| editor.name().to_owned()).collect()
     }
 
+    #[inline]
+    pub fn cfg(&self) -> &EditorConfigs {
+        &self.base_configs
+    }
+
     // MODE HANDLES
 
     #[inline]

@@ -61,7 +61,7 @@ impl Editor {
         big_file_protection(&path)?;
         let indent_cfg = cfg.get_indent_cfg(file_type);
         let text = std::fs::read_to_string(&path)?;
-        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg, gs)?;
+        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg.indent, gs)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
@@ -85,7 +85,7 @@ impl Editor {
         gs.message(WARN_TXT);
         let indent_cfg = cfg.default_indent_cfg();
         let text = std::fs::read_to_string(&path)?;
-        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg, gs)?;
+        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg.indent, gs)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
@@ -110,7 +110,7 @@ impl Editor {
         gs.message(WARN_MD);
         let indent_cfg = cfg.default_indent_cfg();
         let text = std::fs::read_to_string(&path)?;
-        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg, gs)?;
+        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg.indent, gs)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
@@ -199,6 +199,11 @@ impl Editor {
     #[inline]
     pub fn file_status_set_overwritten(&mut self) {
         self.saved_version = FILE_UPDATED_VERSION;
+    }
+
+    #[inline]
+    pub fn indent_cfg(&self) -> &IndentConfigs {
+        &self.actions.cfg
     }
 
     // RENDER

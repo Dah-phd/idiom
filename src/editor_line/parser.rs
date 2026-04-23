@@ -1,5 +1,4 @@
 use crate::{
-    configs::IndentConfigs,
     editor_line::EditorLine,
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
@@ -40,20 +39,20 @@ pub struct ParsedLines<'a> {
 impl ParsedLines<'_> {
     pub fn into_content_or_popup_if_not_formatted(
         self,
-        cfg: &IndentConfigs,
+        indent: &str,
         gs: &mut GlobalState,
     ) -> IdiomResult<Vec<EditorLine>> {
         if self.is_formatted() || !self.popup_confirm_sanitize(gs)? {
             return Ok(self.into_editor_lines());
         }
-        Ok(self.into_sanitzed_editor_lines(cfg))
+        Ok(self.into_sanitzed_editor_lines(indent))
     }
 
     pub fn into_editor_lines(self) -> Vec<EditorLine> {
         self.transform_to_editor_lines(|text, line_end| EditorLine::new(text, line_end))
     }
 
-    pub fn into_sanitzed_editor_lines(mut self, cfg: &IndentConfigs) -> Vec<EditorLine> {
+    pub fn into_sanitzed_editor_lines(mut self, indent: &str) -> Vec<EditorLine> {
         if self.tabs.is_empty() {
             return self.transform_to_editor_lines(|text, _| EditorLine::new_posix(text));
         }
@@ -61,7 +60,7 @@ impl ParsedLines<'_> {
         let mut idx = 0;
         self.transform_to_editor_lines(|mut text, _| {
             if tabs.contains(&idx) {
-                text = text.replace('\t', cfg.indent.as_str());
+                text = text.replace('\t', indent);
             }
             idx += 1;
             EditorLine::new_posix(text)
@@ -73,6 +72,7 @@ impl ParsedLines<'_> {
     }
 
     /// ensures that no restricted control chars are present
+    /// removing restricted control chars is unlikely
     fn transform_to_editor_lines(self, mut cb: impl FnMut(String, LineEnd) -> EditorLine) -> Vec<EditorLine> {
         let ParsedLines { content, replaced_esc_cc, replaced_backspaces_cc, .. } = self;
         match (replaced_esc_cc.is_empty(), replaced_backspaces_cc.is_empty()) {
@@ -304,7 +304,30 @@ impl LineParser {
         results
     }
 
-    pub fn sanitize_text(text: &str) -> String {
-        todo!()
+    pub fn sanitize_text(text: &str, indent: &str) -> String {
+        let mut result = text.to_owned();
+        let mut replacements = vec![];
+        let mut lines = Self::lexer(text);
+        while let Some(token) = lines.next() {
+            let replacement = match token {
+                Err(..) | Ok(Self::POSIX_NEWLINE) => continue,
+                Ok(Self::TAB) => (lines.span(), indent),
+                Ok(Self::BACKSPACE_CC | Self::ESC_CC) => (lines.span(), ""),
+                Ok(
+                    Self::MSDOS_NEWLINE
+                    | Self::RISCOS_NEWLINE
+                    | Self::CARRIAGE_NEWLINE
+                    | Self::FROM_FEED
+                    | Self::FILE_END
+                    | Self::RECORD_END
+                    | Self::VERTICAL_TAB,
+                ) => (lines.span(), "\n"),
+            };
+            replacements.push(replacement);
+        }
+        for (range, replacement) in replacements.into_iter().rev() {
+            result.replace_range(range, replacement);
+        }
+        result
     }
 }

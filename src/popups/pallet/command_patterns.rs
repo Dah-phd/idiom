@@ -2,7 +2,7 @@ use super::Components;
 use crate::{
     app::MIN_FRAMERATE,
     editor::Editor,
-    editor_line::EditorLine,
+    editor_line::LineParser,
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
     ext_tui::pty::PtyShell,
@@ -264,7 +264,7 @@ fn shell_executor(
                             gs.error(format!("CMD STATUS: {status}"));
                         } else {
                             let editor = ws.get_active().ok_or(IdiomError::any("No files open in editor!"))?;
-                            editor.paste(logs, gs);
+                            editor.paste(LineParser::sanitize_text(logs.as_str(), &editor.indent_cfg().indent), gs);
                         }
                         return Ok(());
                     }
@@ -280,7 +280,8 @@ fn shell_executor(
                     path.push(format!("{name}_{id}.out"));
                     id += 1;
                 }
-                let content = logs.lines().map(EditorLine::from).collect();
+                let indent = ws.cfg().indent();
+                let content = LineParser::split_lines(&logs).into_sanitzed_editor_lines(&indent);
                 ws.create_text_editor_from_data(path, content, None, gs);
                 return Ok(());
             }
