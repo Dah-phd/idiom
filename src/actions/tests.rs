@@ -244,9 +244,9 @@ fn insert_clip_with_indent_skip() {
     let big_clippy = "  text\n\ntext\n".to_owned();
     let mut edits = vec![];
     let cfg = IndentConfigs::default();
-    edits.push(Edit::insert_clip_with_indent(CursorPosition { line: 5, char: 15 }, clippy, &cfg, &mut content));
+    edits.push(Edit::insert_clip_try_indented(CursorPosition { line: 5, char: 15 }, clippy, &cfg, &mut content));
     match_line(&content[5], &"there will be 🚀  text everywhere in the end");
-    edits.push(Edit::insert_clip_with_indent(CursorPosition { line: 5, char: 14 }, big_clippy, &cfg, &mut content));
+    edits.push(Edit::insert_clip_try_indented(CursorPosition { line: 5, char: 14 }, big_clippy, &cfg, &mut content));
     match_line(&content[5], &"there will be   text");
     match_line(&content[6], &"");
     match_line(&content[7], &"text");
@@ -261,10 +261,10 @@ fn paste_with_indent() {
     let big_clippy = "  text\n\ntext\n".to_owned();
     let mut edits = vec![];
     let cfg = IndentConfigs::default();
-    edits.push(Edit::insert_clip_with_indent(CursorPosition { line: 7, char: 4 }, clippy, &cfg, &mut content));
+    edits.push(Edit::insert_clip_try_indented(CursorPosition { line: 7, char: 4 }, clippy, &cfg, &mut content));
     // no effect due to inline paste
     match_line(&content[7], &"      textthis is the first scope");
-    edits.push(Edit::insert_clip_with_indent(CursorPosition { line: 7, char: 4 }, big_clippy, &cfg, &mut content));
+    edits.push(Edit::insert_clip_try_indented(CursorPosition { line: 7, char: 4 }, big_clippy, &cfg, &mut content));
     match_line(&content[7], &"    text");
     match_line(&content[8], &"");
     match_line(&content[9], &"    text");
@@ -277,7 +277,7 @@ fn paste_indent_derived() {
     let mut content = create_content();
     let clip = "println!(\"hello there\");\n".to_owned();
     let cfg = IndentConfigs::default();
-    let edits = vec![Edit::insert_clip_with_indent(
+    let edits = vec![Edit::insert_clip_try_indented(
         CursorPosition { line: 7, char: 0 },
         clip,
         &cfg,
@@ -295,7 +295,7 @@ fn paste_with_deep_indent() {
     let mut content = create_content();
     let big_clippy = "    text\n    \n    text\n".to_owned();
     let cfg = IndentConfigs::default();
-    let edits = vec![Edit::insert_clip_with_indent(
+    let edits = vec![Edit::insert_clip_try_indented(
         CursorPosition { line: 7, char: 4 },
         big_clippy,
         &cfg,

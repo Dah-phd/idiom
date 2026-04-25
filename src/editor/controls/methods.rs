@@ -106,6 +106,25 @@ pub fn multic_copy(editor: &mut Editor) -> Option<String> {
     Some(clips.into_iter().rev().map(with_new_line_if_not).collect())
 }
 
+pub fn insert_indeted(editor: &mut Editor, clip: String) {
+    editor.actions.insert_indented(clip, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
+}
+
+pub fn multic_insert_indeted(editor: &mut Editor, clip: String) {
+    if editor.controls.cursors.len() == clip.lines().count() {
+        let mut clip_lines = clip.lines().rev();
+        apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+            if let Some(next_clip) = clip_lines.next() {
+                actions.insert_indented(next_clip.to_owned(), cursor, content, lexer);
+            };
+        });
+    } else {
+        apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+            actions.insert_indented(clip.to_owned(), cursor, content, lexer);
+        });
+    }
+}
+
 pub fn paste(editor: &mut Editor, clip: String) {
     editor.actions.paste(clip, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
 }

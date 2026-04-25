@@ -1,5 +1,7 @@
 use super::EditMetaData;
-use super::utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content};
+use super::utils::{
+    clip_content, insert_clip, insert_lines_indented, insert_lines_try_indented, is_scope, remove_content,
+};
 use idiom_tui::UTFSafe;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use std::{cmp::Ordering, fmt::Debug};
@@ -116,7 +118,19 @@ impl Edit {
     }
 
     #[inline]
-    pub fn insert_clip_with_indent(
+    pub fn insert_clip_try_indented(
+        cursor: CursorPosition,
+        clip: String,
+        cfg: &IndentConfigs,
+        content: &mut Vec<EditorLine>,
+    ) -> Self {
+        let (new_clip, end) = insert_lines_try_indented(&clip, cfg, content, cursor);
+        let to = (end.line - cursor.line) + 1;
+        Self::without_select(cursor, 1, to, new_clip, String::new())
+    }
+
+    #[inline]
+    pub fn insert_clip_indented(
         cursor: CursorPosition,
         clip: String,
         cfg: &IndentConfigs,

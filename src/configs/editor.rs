@@ -310,6 +310,16 @@ impl IndentConfigs {
         indent
     }
 
+    pub fn derive_indent_from_str(&self, text: &str) -> String {
+        let mut indent = text.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
+        if let Some(last) = text.trim_end().chars().last()
+            && self.indent_after.contains(last)
+        {
+            indent.insert_str(0, &self.indent);
+        };
+        indent
+    }
+
     pub fn derive_indent_from_lines(&self, prev_lines: &[EditorLine]) -> String {
         for prev_line in prev_lines.iter().rev() {
             if !prev_line.chars().all(|c| c.is_whitespace()) {

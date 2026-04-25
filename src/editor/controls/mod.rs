@@ -17,6 +17,7 @@ pub struct ControlMap {
     pub insert_import: fn(&mut Editor, String),
     pub insert_snippet: fn(&mut Editor, String, Option<(usize, usize)>),
     pub insert_snippet_with_select: fn(&mut Editor, String, (usize, usize), usize),
+    pub insert_indented: fn(&mut Editor, String),
     pub replace_token: fn(&mut Editor, String),
     pub replace_select: fn(&mut Editor, CursorPosition, CursorPosition, &str),
     pub mass_replace: fn(&mut Editor, Vec<(CursorPosition, CursorPosition)>, String),
@@ -159,6 +160,7 @@ impl ControlMap {
         self.replace_token = methods::multic_replace_token;
         self.insert_snippet = methods::multic_insert_snippet;
         self.insert_snippet_with_select = methods::multic_insert_snippet_with_select;
+        self.insert_indented = methods::multic_insert_indeted;
 
         self.cut = methods::multic_cut;
         self.copy = methods::multic_copy;
@@ -173,6 +175,7 @@ impl ControlMap {
         self.replace_token = methods::replace_token;
         self.insert_snippet = methods::insert_snippet;
         self.insert_snippet_with_select = methods::insert_snippet_with_select;
+        self.insert_indented = methods::insert_indeted;
 
         self.cut = methods::cut;
         self.copy = methods::copy;
@@ -188,6 +191,7 @@ impl Default for ControlMap {
             insert_snippet_with_select: methods::insert_snippet_with_select,
             insert_snippet: methods::insert_snippet,
             insert_import: methods::insert_import,
+            insert_indented: methods::insert_indeted,
             replace_token: methods::replace_token,
             replace_select: methods::replace_select,
             mass_replace: methods::mass_replace,

@@ -264,7 +264,11 @@ fn shell_executor(
                             gs.error(format!("CMD STATUS: {status}"));
                         } else {
                             let editor = ws.get_active().ok_or(IdiomError::any("No files open in editor!"))?;
-                            editor.paste(LineParser::sanitize_text(logs.as_str(), &editor.indent_cfg().indent), gs);
+                            let mut clip = LineParser::sanitize_text(logs.as_str(), &editor.indent_cfg().indent);
+                            if clip.contains('\n') {
+                                clip.insert(0, '\n');
+                            }
+                            editor.insert_indented(clip);
                         }
                         return Ok(());
                     }

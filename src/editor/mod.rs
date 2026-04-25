@@ -609,6 +609,13 @@ impl Editor {
         (self.controls.insert_snippet_with_select)(self, snippet, cursor_offset, len);
     }
 
+    /// autmatically indents the clip if multilend or does not fix multic count
+    /// removes drops select if select is present
+    #[inline(always)]
+    pub fn insert_indented(&mut self, clip: String) {
+        (self.controls.insert_indented)(self, clip);
+    }
+
     #[inline(always)]
     pub fn mass_replace(&mut self, ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
         (self.controls.mass_replace)(self, ranges, clip);
@@ -617,7 +624,7 @@ impl Editor {
     #[inline(always)]
     pub fn apply_file_edits(&mut self, edits: Vec<TextEdit>) {
         self.codec.clear_cache();
-        (self.controls.apply_file_edits)(self, edits)
+        (self.controls.apply_file_edits)(self, edits);
     }
 
     #[inline(always)]
@@ -639,7 +646,7 @@ impl Editor {
         if taken {
             return;
         }
-        (self.controls.paste)(self, clip)
+        (self.controls.paste)(self, clip);
     }
 
     #[inline]

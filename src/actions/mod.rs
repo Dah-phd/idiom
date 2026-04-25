@@ -465,10 +465,32 @@ impl Actions {
         }
     }
 
+    pub fn insert_indented(
+        &mut self,
+        clip: String,
+        cursor: &mut Cursor,
+        content: &mut Vec<EditorLine>,
+        lexer: &mut Lexer,
+    ) {
+        match cursor.select_take() {
+            Some((from, to)) => {
+                let remove = Edit::remove_select(from, to, content);
+                let insert_clip = Edit::insert_clip_indented(from, clip, &self.cfg, content);
+                cursor.set_position(insert_clip.end_position());
+                self.push_done(vec![remove, insert_clip], lexer, content);
+            }
+            None => {
+                let edit = Edit::insert_clip_indented(cursor.into(), clip, &self.cfg, content);
+                cursor.set_position(edit.end_position());
+                self.push_done(edit, lexer, content);
+            }
+        };
+    }
+
     pub fn paste(&mut self, clip: String, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         let edit = match cursor.select_take() {
             Some((from, to)) => Edit::replace_select(from, to, clip, content),
-            None => Edit::insert_clip_with_indent(cursor.into(), clip, &self.cfg, content),
+            None => Edit::insert_clip_try_indented(cursor.into(), clip, &self.cfg, content),
         };
         cursor.set_position(edit.end_position());
         self.push_done(edit, lexer, content);
