@@ -267,6 +267,7 @@ fn shell_executor(
                             let mut clip = LineParser::sanitize_text(logs.as_str(), &editor.indent_cfg().indent);
                             if clip.contains('\n') {
                                 clip.insert(0, '\n');
+                                clip.push('\n');
                             }
                             editor.insert_indented(clip);
                         }
