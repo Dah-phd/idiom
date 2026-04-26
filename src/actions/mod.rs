@@ -372,7 +372,10 @@ impl Actions {
 
                     let edits = dir.apply_ordered((new_from, from), (new_to, to), |(new_from, from), (new_c, c)| {
                         cursor.select_set(new_from, new_c);
-                        vec![first_edit.select(from, c), second_edit.new_select(new_from, new_c)]
+                        vec![
+                            first_edit.with_select(from, c),
+                            second_edit.with_new_select(new_from, new_c),
+                        ]
                     });
 
                     self.push_done(edits, lexer, content);
@@ -476,8 +479,9 @@ impl Actions {
             Some((from, to)) => {
                 let remove = Edit::remove_select(from, to, content);
                 let insert_clip = Edit::insert_clip_indented(from, clip, &self.cfg, content);
-                cursor.set_position(insert_clip.end_position());
-                self.push_done(vec![remove, insert_clip], lexer, content);
+                let select_to = insert_clip.end_position();
+                cursor.select_set(from, select_to);
+                self.push_done(vec![remove, insert_clip.with_new_select(from, select_to)], lexer, content);
             }
             None => {
                 let edit = Edit::insert_clip_indented(cursor.into(), clip, &self.cfg, content);

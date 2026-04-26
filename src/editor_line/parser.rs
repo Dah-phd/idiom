@@ -49,7 +49,7 @@ impl ParsedLines<'_> {
     }
 
     pub fn into_editor_lines(self) -> Vec<EditorLine> {
-        self.transform_to_editor_lines(|text, line_end| EditorLine::new(text, line_end))
+        self.transform_to_editor_lines(EditorLine::new)
     }
 
     pub fn into_sanitzed_editor_lines(mut self, indent: &str) -> Vec<EditorLine> {

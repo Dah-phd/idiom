@@ -306,12 +306,12 @@ impl Edit {
         &self.reverse
     }
 
-    pub fn select(mut self, from: CursorPosition, to: CursorPosition) -> Self {
+    pub fn with_select(mut self, from: CursorPosition, to: CursorPosition) -> Self {
         self.select = Some((from, to));
         self
     }
 
-    pub fn new_select(mut self, from: CursorPosition, to: CursorPosition) -> Self {
+    pub fn with_new_select(mut self, from: CursorPosition, to: CursorPosition) -> Self {
         self.new_select = Some((from, to));
         self
     }

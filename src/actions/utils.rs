@@ -116,7 +116,7 @@ pub fn insert_lines_indented(
 
     // infering indent if not derived from first line
     let mut indent = match cursor.char {
-        0 => cfg.derive_indent_from_lines(&content[..=cursor.line]),
+        0 => cfg.derive_indent_from_lines(&content[..cursor.line]),
         pos_char => cfg.derive_indent_from_str(content[cursor.line].get_to(pos_char).expect("checked within cursor!")),
     };
     let mut new_clip = format!("{indent}{}", first_line.trim_start());
