@@ -238,7 +238,59 @@ fn edit_insert_clip() {
 }
 
 #[test]
-fn insert_clip_with_indent_skip() {
+fn insert_clip_try_indented() {
+    let cfg = IndentConfigs::default();
+
+    let mut edits = vec![];
+    let mut content = vec![EditorLine::from("fn test() {}")];
+    let expect = content.iter().map(|c| EditorLine::from(c.as_str())).collect::<Vec<_>>();
+    edits.push(Edit::insert_clip_try_indented((0, 11).into(), "\nlet b = 3;\nreturn b;".into(), &cfg, &mut content));
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "let b = 3;");
+    assert_eq!(content[2].as_str(), "return b;}");
+    assert_edits_applicable_with_init_content(&expect, content, edits);
+
+    let mut edits = vec![];
+    let mut content = vec![EditorLine::from("fn test() {}")];
+    let expect = content.iter().map(|c| EditorLine::from(c.as_str())).collect::<Vec<_>>();
+    edits.push(Edit::insert_clip_try_indented((0, 11).into(), "\nlet b = 3;\nreturn b;\n".into(), &cfg, &mut content));
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "let b = 3;");
+    assert_eq!(content[2].as_str(), "return b;");
+    assert_eq!(content[3].as_str(), "}");
+    assert_edits_applicable_with_init_content(&expect, content, edits);
+
+    let mut edits = vec![];
+    let mut content = vec![EditorLine::from("fn test() {"), EditorLine::from("   }")];
+    let expect = content.iter().map(|c| EditorLine::from(c.as_str())).collect::<Vec<_>>();
+    edits.push(Edit::insert_clip_try_indented((1, 3).into(), "let b = 3;\nreturn b;\n".into(), &cfg, &mut content));
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "   let b = 3;");
+    assert_eq!(content[2].as_str(), "return b;");
+    assert_eq!(content[3].as_str(), "}");
+    assert_edits_applicable_with_init_content(&expect, content, edits);
+    
+    let mut edits = vec![];
+    let mut content = vec![EditorLine::from("fn test() {"), EditorLine::from("    }")];
+    let expect = content.iter().map(|c| EditorLine::from(c.as_str())).collect::<Vec<_>>();
+    edits.push(Edit::insert_clip_try_indented((1, 4).into(), "let b = 3;\nreturn b;\n".into(), &cfg, &mut content));
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "    let b = 3;");
+    assert_eq!(content[2].as_str(), "    return b;");
+    assert_eq!(content[3].as_str(), "}");
+    assert_edits_applicable_with_init_content(&expect, content, edits);
+
+    let mut edits = vec![];
+    let mut content = vec![EditorLine::from("fn test() {}")];
+    let expect = content.iter().map(|c| EditorLine::from(c.as_str())).collect::<Vec<_>>();
+    edits.push(Edit::insert_clip_try_indented((0, 11).into(), "return".into(), &cfg, &mut content));
+    assert_eq!(content[0].as_str(), "fn test() {return}");
+    assert_eq!(content.len(), 1);
+    assert_edits_applicable_with_init_content(&expect, content, edits);
+}
+
+#[test]
+fn insert_clip_try_indented_skip() {
     let mut content = create_content();
     let clippy = "  text".to_owned();
     let big_clippy = "  text\n\ntext\n".to_owned();
@@ -252,6 +304,48 @@ fn insert_clip_with_indent_skip() {
     match_line(&content[7], &"text");
     match_line(&content[8], &"🚀  text everywhere in the end");
     assert_edits_applicable(content, edits);
+}
+
+#[test]
+fn insert_clip_indented() {
+    let cfg = IndentConfigs::default();
+
+    let mut edits = vec![];
+    let mut content = vec![EditorLine::from("fn test() {}")];
+    let expect = content.iter().map(|c| EditorLine::from(c.as_str())).collect::<Vec<_>>();
+    edits.push(Edit::insert_clip_indented((0, 11).into(), "\nlet b = 3;\nreturn b;".into(), &cfg, &mut content));
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "    let b = 3;");
+    assert_eq!(content[2].as_str(), "    return b;}");
+    assert_edits_applicable_with_init_content(&expect, content, edits);
+
+    let mut edits = vec![];
+    let mut content = vec![EditorLine::from("fn test() {}")];
+    let expect = content.iter().map(|c| EditorLine::from(c.as_str())).collect::<Vec<_>>();
+    edits.push(Edit::insert_clip_indented((0, 11).into(), "\nlet b = 3;\nreturn b;\n".into(), &cfg, &mut content));
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "    let b = 3;");
+    assert_eq!(content[2].as_str(), "    return b;");
+    assert_eq!(content[3].as_str(), "}");
+    assert_edits_applicable_with_init_content(&expect, content, edits);
+
+    let mut edits = vec![];
+    let mut content = vec![EditorLine::from("fn test() {"), EditorLine::from("   }")];
+    let expect = content.iter().map(|c| EditorLine::from(c.as_str())).collect::<Vec<_>>();
+    edits.push(Edit::insert_clip_indented((1, 3).into(), "let b = 3;\nreturn b;\n".into(), &cfg, &mut content));
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "   let b = 3;");
+    assert_eq!(content[2].as_str(), "   return b;");
+    assert_eq!(content[3].as_str(), "}");
+    assert_edits_applicable_with_init_content(&expect, content, edits);
+
+    let mut edits = vec![];
+    let mut content = vec![EditorLine::from("fn test() {}")];
+    let expect = content.iter().map(|c| EditorLine::from(c.as_str())).collect::<Vec<_>>();
+    edits.push(Edit::insert_clip_indented((0, 11).into(), "return".into(), &cfg, &mut content));
+    assert_eq!(content[0].as_str(), "fn test() {return}");
+    assert_eq!(content.len(), 1);
+    assert_edits_applicable_with_init_content(&expect, content, edits);
 }
 
 #[test]
@@ -602,6 +696,24 @@ fn test_insert_try_indented() {
     assert_eq!(content[1].as_str(), "    let b = 3;");
     assert_eq!(content[2].as_str(), "    return b;");
     assert_eq!(content[3].as_str(), "}");
+
+    let mut content = vec![EditorLine::new_posix("fn test() {}".to_owned())];
+    insert_lines_try_indented("\nlet b = 3;\nreturn b;\n", &cfg, &mut content, (0, 11).into());
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "let b = 3;");
+    assert_eq!(content[2].as_str(), "return b;");
+    assert_eq!(content[3].as_str(), "}");
+
+    let mut content = vec![
+        EditorLine::new_posix("fn test() {".to_owned()),
+        EditorLine::new_posix("   }".to_owned()),
+    ];
+    insert_lines_try_indented("let b = 3;\nreturn b;\n", &cfg, &mut content, (1, 3).into());
+
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "   let b = 3;");
+    assert_eq!(content[2].as_str(), "return b;");
+    assert_eq!(content[3].as_str(), "}")
 }
 
 #[test]
@@ -636,6 +748,17 @@ fn test_insert_indented() {
     assert_eq!(content[0].as_str(), "fn test() {");
     assert_eq!(content[1].as_str(), "    let b = 3;");
     assert_eq!(content[2].as_str(), "    return b;");
+    assert_eq!(content[3].as_str(), "}");
+
+    let mut content = vec![
+        EditorLine::new_posix("fn test() {".to_owned()),
+        EditorLine::new_posix("   }".to_owned()),
+    ];
+    insert_lines_indented("let b = 3;\nreturn b;\n", &cfg, &mut content, (1, 3).into());
+
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "   let b = 3;");
+    assert_eq!(content[2].as_str(), "   return b;");
     assert_eq!(content[3].as_str(), "}");
 }
 

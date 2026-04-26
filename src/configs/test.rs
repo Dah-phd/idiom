@@ -172,19 +172,37 @@ fn test_editor_key_map_char_mapping() {
 }
 
 #[test]
-fn test_undent_before_base_pattern_string() {
+fn test_undent_before_base_pattern() {
     let cfg = IndentConfigs::default();
     assert_eq!(cfg.indent.as_str(), "    ");
     let mut text = EditorLine::from("    }");
     cfg.unindent_if_before_base_pattern(&mut text);
     assert_eq!("}", text.as_str());
+    let mut text = EditorLine::from("   }");
+    cfg.unindent_if_before_base_pattern(&mut text);
+    assert_eq!("   }", text.as_str());
 }
 
 #[test]
-fn test_undent_before_base_pattern() {
+fn test_undent_before_base_pattern_string() {
     let cfg = IndentConfigs::default();
     assert_eq!(cfg.indent.as_str(), "    ");
     let mut text = "    }".to_owned();
     cfg.unindent_if_before_base_pattern_string(&mut text);
     assert_eq!("}", &text);
+    let mut text = "   }".to_owned();
+    cfg.unindent_if_before_base_pattern_string(&mut text);
+    assert_eq!("   }", &text);
+}
+
+#[test]
+fn test_has_unindent_patters() {
+    let cfg = IndentConfigs::default();
+    assert!(cfg.has_unindent_pattern("    } x"));
+    assert!(cfg.has_unindent_pattern("   }"));
+    assert!(cfg.has_unindent_pattern("  }"));
+    assert!(cfg.has_unindent_pattern(" }"));
+    assert!(cfg.has_unindent_pattern("}"));
+    assert!(cfg.has_unindent_pattern("}asdw;"));
+    assert!(!cfg.has_unindent_pattern("    x}"));
 }

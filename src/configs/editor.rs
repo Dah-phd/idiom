@@ -290,10 +290,13 @@ impl IndentConfigs {
         self
     }
 
+    #[inline]
+    pub fn has_unindent_pattern(&self, text: &str) -> bool {
+        matches!(text.trim_start().chars().next(), Some(first) if self.unindent_before.contains(first))
+    }
+
     pub fn unindent_if_before_base_pattern(&self, line: &mut EditorLine) -> usize {
-        if line.starts_with(&self.indent)
-            && matches!(line.trim_start().chars().next(), Some(first) if self.unindent_before.contains(first))
-        {
+        if line.starts_with(&self.indent) && self.has_unindent_pattern(line.as_str()) {
             line.replace_till(self.indent.len(), "");
             return self.indent.len();
         }
@@ -301,9 +304,7 @@ impl IndentConfigs {
     }
 
     pub fn unindent_if_before_base_pattern_string(&self, line: &mut String) -> usize {
-        if line.starts_with(&self.indent)
-            && matches!(line.trim_start().chars().next(), Some(first) if self.unindent_before.contains(first))
-        {
+        if line.starts_with(&self.indent) && self.has_unindent_pattern(line.as_str()) {
             line.replace_range(..self.indent.len(), "");
             return self.indent.len();
         }
