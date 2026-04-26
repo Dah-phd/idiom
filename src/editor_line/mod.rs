@@ -84,7 +84,7 @@ impl EditorLine {
 
     #[inline(always)]
     pub fn as_str(&self) -> &str {
-        self.content.as_str()
+        &self.content
     }
 
     #[inline(always)]

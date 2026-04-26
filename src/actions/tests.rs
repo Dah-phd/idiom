@@ -2,16 +2,16 @@ use super::{
     Actions,
     edits::NewLineResult,
     meta::EditMetaData,
-    utils::{clip_content, copy_content, get_closing_char_from_context, insert_clip, remove_content},
+    utils::{
+        clip_content, copy_content, get_closing_char_from_context, insert_clip, insert_lines_indented,
+        insert_lines_try_indented, remove_content,
+    },
 };
 use crate::actions::Action;
 use crate::actions::Edit;
 use crate::configs::{FileType, IndentConfigs};
 use crate::cursor::{Cursor, CursorPosition};
-use crate::editor::syntax::{
-    Encoding, Lexer,
-    tests::{intercept_sync, intercept_sync_rev},
-};
+use crate::editor::syntax::{Encoding, Lexer};
 use crate::editor_line::EditorLine;
 use crate::lsp::LSPResult;
 use lsp_types::{Position, Range};
@@ -519,8 +519,8 @@ fn push_char_with_closing_and_select() {
     let end = " [asd] ";
     let cfg = IndentConfigs::default();
     let mut lexer = Lexer::with_context(FileType::Rust, PathBuf::new().as_path());
-    intercept_sync(&mut lexer, probe_char_closing_with_select);
-    intercept_sync_rev(&mut lexer, probe_char_closing_with_select_rev);
+    lexer.intercept_sync(probe_char_closing_with_select);
+    lexer.intercept_sync_rev(probe_char_closing_with_select_rev);
     let mut actions = Actions::new(cfg);
     let mut content = vec![EditorLine::from(String::from(start))];
     let mut cursor = Cursor::default();
@@ -581,6 +581,61 @@ fn test_insert_clip() {
     assert_eq!(&content[0].to_string(), "text");
     assert_eq!(&content[1].to_string(), "one🚀first");
     assert_eq!(cursor, CursorPosition { line: 1, char: 0 });
+}
+
+#[test]
+fn test_insert_try_indented() {
+    let cfg = IndentConfigs::default();
+    let mut content = vec![
+        EditorLine::new_posix("fn test() {}".to_owned())
+    ];
+    insert_lines_try_indented("let b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
+    // indenting triggers only on start of line
+    assert_eq!(content[0].as_str(), "fn test() {let b = 3;");
+    assert_eq!(content[1].as_str(), "return b;}");
+
+    let mut content = vec![
+        EditorLine::new_posix("fn test() {".to_owned()),
+        EditorLine::new_posix("".to_owned()),
+        EditorLine::new_posix("}".to_owned()),
+    ];
+    insert_lines_try_indented("let b = 3;\nreturn b;", &cfg, &mut content, (1, 0).into());
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "    let b = 3;");
+    assert_eq!(content[2].as_str(), "    return b;");
+    assert_eq!(content[3].as_str(), "}");
+}
+
+#[test]
+fn test_insert_indented() {
+    let cfg = IndentConfigs::default();
+    let mut content = vec![
+        EditorLine::new_posix("fn test() {}".to_owned())
+    ];
+    insert_lines_indented("let b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
+    // indenting triggers ignoring postion
+    assert_eq!(content[0].as_str(), "fn test() {let b = 3;");
+    assert_eq!(content[1].as_str(), "    return b;}");
+    let cfg = IndentConfigs::default();
+    let mut content = vec![
+        EditorLine::new_posix("fn test() {}".to_owned())
+    ];
+    insert_lines_indented("\nlet b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
+    // indenting triggers only on start of line
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "    let b = 3;");
+    assert_eq!(content[2].as_str(), "    return b;}");
+
+    let mut content = vec![
+        EditorLine::new_posix("fn test() {".to_owned()),
+        EditorLine::new_posix("".to_owned()),
+        EditorLine::new_posix("}".to_owned()),
+    ];
+    insert_lines_indented("let b = 3;\nreturn b;", &cfg, &mut content, (1, 0).into());
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "    let b = 3;");
+    assert_eq!(content[2].as_str(), "    return b;");
+    assert_eq!(content[3].as_str(), "}");
 }
 
 #[test]

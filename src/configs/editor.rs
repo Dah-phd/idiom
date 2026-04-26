@@ -300,14 +300,9 @@ impl IndentConfigs {
         0
     }
 
+    #[inline]
     pub fn derive_indent_from(&self, prev_line: &EditorLine) -> String {
-        let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
-        if let Some(last) = prev_line.trim_end().chars().last()
-            && self.indent_after.contains(last)
-        {
-            indent.insert_str(0, &self.indent);
-        };
-        indent
+        self.derive_indent_from_str(prev_line.as_str())
     }
 
     pub fn derive_indent_from_str(&self, text: &str) -> String {

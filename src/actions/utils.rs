@@ -52,11 +52,12 @@ pub fn insert_lines_try_indented(
     };
 
     // infering indent if not derived from first line
-    let (mut new_clip, mut indent) = if start_indent.is_empty() {
-        let indent = cfg.derive_indent_from_lines(&content[..cursor.line]);
-        (format!("{indent}{}", first_line.trim_start()), indent)
-    } else {
-        (first_line.trim_start().to_owned(), start_indent.to_string())
+    let (mut new_clip, mut indent) = match start_indent.is_empty() {
+        true => {
+            let indent = cfg.derive_indent_from_lines(&content[..cursor.line]);
+            (format!("{indent}{}", first_line.trim_start()), indent)
+        }
+        false => (first_line.trim_start().to_owned(), start_indent.to_string()),
     };
 
     let start_line = &mut content[cursor.line];
@@ -65,8 +66,8 @@ pub fn insert_lines_try_indented(
 
     for clip_line in lines.map(|l| l.trim_start()) {
         cursor.line += 1;
-        if clip_line.chars().all(|c| c.is_whitespace()) {
-            new_clip = push_on_newline(new_clip, "");
+        if clip_line.is_empty() {
+            new_clip.push('\n');
             content.insert(cursor.line, EditorLine::empty());
             continue;
         }
@@ -115,11 +116,16 @@ pub fn insert_lines_indented(
     };
 
     // infering indent if not derived from first line
-    let mut indent = match cursor.char {
-        0 => cfg.derive_indent_from_lines(&content[..cursor.line]),
-        pos_char => cfg.derive_indent_from_str(content[cursor.line].get_to(pos_char).expect("checked within cursor!")),
+    let (mut new_clip, mut indent) = match cursor.char {
+        0 => {
+            let indent = cfg.derive_indent_from_lines(&content[..cursor.line]);
+            (format!("{indent}{}", first_line.trim_start()), indent)
+        }
+        pos_char => (
+            first_line.trim_start().to_owned(),
+            cfg.derive_indent_from_str(content[cursor.line].get_to(pos_char).expect("checked within cursor!")),
+        ),
     };
-    let mut new_clip = format!("{indent}{}", first_line.trim_start());
 
     let start_line = &mut content[cursor.line];
     let mut end_line = start_line.split_off(cursor.char);
@@ -127,8 +133,8 @@ pub fn insert_lines_indented(
 
     for clip_line in lines.map(|l| l.trim_start()) {
         cursor.line += 1;
-        if clip_line.chars().all(|c| c.is_whitespace()) {
-            new_clip = push_on_newline(new_clip, "");
+        if clip_line.is_empty() {
+            new_clip.push('\n');
             content.insert(cursor.line, EditorLine::empty());
             continue;
         }

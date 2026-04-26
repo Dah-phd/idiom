@@ -17,23 +17,25 @@ use idiom_tui::Backend;
 use lsp_types::{SemanticToken, TextDocumentContentChangeEvent};
 use std::path::PathBuf;
 
-pub fn intercept_sync(lexer: &mut Lexer, sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>) {
-    lexer.sync = sync;
-}
+impl Lexer {
+    pub fn intercept_sync(&mut self, sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>) {
+        self.sync = sync;
+    }
 
-pub fn intercept_sync_rev(lexer: &mut Lexer, sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>) {
-    lexer.sync_rev = sync;
-}
+    pub fn intercept_sync_rev(&mut self, sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>) {
+        self.sync_rev = sync;
+    }
 
-pub fn intercept_sync_changes(
-    lexer: &mut Lexer,
-    sync_changes: fn(&mut Lexer, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
-) {
-    lexer.sync_changes = sync_changes;
-}
+    pub fn intercept_sync_changes(
+        &mut self,
+        sync_changes: fn(&mut Lexer, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
+    ) {
+        self.sync_changes = sync_changes;
+    }
 
-pub fn intercept_tokens(lexer: &mut Lexer, sync_tokens: fn(&mut Lexer, EditMetaData)) {
-    lexer.sync_tokens = sync_tokens;
+    pub fn intercept_tokens(&mut self, sync_tokens: fn(&mut Lexer, EditMetaData)) {
+        self.sync_tokens = sync_tokens;
+    }
 }
 
 fn get_text() -> Vec<String> {
@@ -1084,10 +1086,10 @@ fn test_sync_struct() {
     let action = Action::Single(edit);
 
     let mut lexer_part = mock_utf16_lexer(FileType::Rust);
-    intercept_tokens(&mut lexer_part, sync_tokens);
-    intercept_sync_changes(&mut lexer_part, sync_changes);
+    lexer_part.intercept_tokens(sync_tokens);
+    lexer_part.intercept_sync_changes(sync_changes);
     let mut lexer_full = mock_utf16_lexer(FileType::Rust);
-    intercept_sync(&mut lexer_full, sync_action);
+    lexer_full.intercept_sync(sync_action);
 
     let mut rx_part = lexer_part.client.get_receiver();
     let mut rx_full = lexer_full.client.get_receiver();
