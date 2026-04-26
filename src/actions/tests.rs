@@ -269,7 +269,7 @@ fn insert_clip_try_indented() {
     assert_eq!(content[2].as_str(), "return b;");
     assert_eq!(content[3].as_str(), "}");
     assert_edits_applicable_with_init_content(&expect, content, edits);
-    
+
     let mut edits = vec![];
     let mut content = vec![EditorLine::from("fn test() {"), EditorLine::from("    }")];
     let expect = content.iter().map(|c| EditorLine::from(c.as_str())).collect::<Vec<_>>();
