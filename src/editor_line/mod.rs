@@ -336,7 +336,25 @@ impl EditorLine {
         self.cached.reset();
     }
 
-    #[inline]
+    pub fn split_off_string(&mut self, at: usize) -> String {
+        self.cached.reset();
+        if at == 0 {
+            let split = std::mem::take(self);
+            split.content
+        } else if at == self.char_len() {
+            String::new()
+        } else {
+            let content = match self.is_simple() {
+                true => self.content.split_off(at),
+                false => self.content.split_off_at_char(at),
+            };
+            self.char_len = at;
+            self.tokens.clear();
+            self.diagnostics = None;
+            content
+        }
+    }
+
     pub fn split_off(&mut self, at: usize) -> Self {
         self.cached.reset();
         if at == 0 {

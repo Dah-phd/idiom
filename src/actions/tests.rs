@@ -586,9 +586,7 @@ fn test_insert_clip() {
 #[test]
 fn test_insert_try_indented() {
     let cfg = IndentConfigs::default();
-    let mut content = vec![
-        EditorLine::new_posix("fn test() {}".to_owned())
-    ];
+    let mut content = vec![EditorLine::new_posix("fn test() {}".to_owned())];
     insert_lines_try_indented("let b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
     // indenting triggers only on start of line
     assert_eq!(content[0].as_str(), "fn test() {let b = 3;");
@@ -609,17 +607,13 @@ fn test_insert_try_indented() {
 #[test]
 fn test_insert_indented() {
     let cfg = IndentConfigs::default();
-    let mut content = vec![
-        EditorLine::new_posix("fn test() {}".to_owned())
-    ];
+    let mut content = vec![EditorLine::new_posix("fn test() {}".to_owned())];
     insert_lines_indented("let b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
     // indenting triggers ignoring postion
     assert_eq!(content[0].as_str(), "fn test() {let b = 3;");
     assert_eq!(content[1].as_str(), "    return b;}");
     let cfg = IndentConfigs::default();
-    let mut content = vec![
-        EditorLine::new_posix("fn test() {}".to_owned())
-    ];
+    let mut content = vec![EditorLine::new_posix("fn test() {}".to_owned())];
     insert_lines_indented("\nlet b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
     // indenting triggers only on start of line
     assert_eq!(content[0].as_str(), "fn test() {");
@@ -632,6 +626,13 @@ fn test_insert_indented() {
         EditorLine::new_posix("}".to_owned()),
     ];
     insert_lines_indented("let b = 3;\nreturn b;", &cfg, &mut content, (1, 0).into());
+    assert_eq!(content[0].as_str(), "fn test() {");
+    assert_eq!(content[1].as_str(), "    let b = 3;");
+    assert_eq!(content[2].as_str(), "    return b;");
+    assert_eq!(content[3].as_str(), "}");
+
+    let mut content = vec![EditorLine::new_posix("fn test() {}".to_owned())];
+    insert_lines_indented("\nlet b = 3;\nreturn b;\n", &cfg, &mut content, (0, 11).into());
     assert_eq!(content[0].as_str(), "fn test() {");
     assert_eq!(content[1].as_str(), "    let b = 3;");
     assert_eq!(content[2].as_str(), "    return b;");

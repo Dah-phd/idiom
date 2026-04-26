@@ -300,6 +300,16 @@ impl IndentConfigs {
         0
     }
 
+    pub fn unindent_if_before_base_pattern_string(&self, line: &mut String) -> usize {
+        if line.starts_with(&self.indent)
+            && matches!(line.trim_start().chars().next(), Some(first) if self.unindent_before.contains(first))
+        {
+            line.replace_range(..self.indent.len(), "");
+            return self.indent.len();
+        }
+        0
+    }
+
     #[inline]
     pub fn derive_indent_from(&self, prev_line: &EditorLine) -> String {
         self.derive_indent_from_str(prev_line.as_str())

@@ -52,50 +52,75 @@ pub fn insert_lines_try_indented(
     };
 
     // infering indent if not derived from first line
-    let (mut new_clip, mut indent) = match start_indent.is_empty() {
+    let (mut edit_clip, mut indent) = match start_indent.is_empty() {
         true => {
             let indent = cfg.derive_indent_from_lines(&content[..cursor.line]);
-            (format!("{indent}{}", first_line.trim_start()), indent)
+            let mut new_clip = indent.to_owned();
+            new_clip.push_str(first_line.trim_start());
+            (new_clip, indent)
         }
         false => (first_line.trim_start().to_owned(), start_indent.to_string()),
     };
 
     let start_line = &mut content[cursor.line];
-    let mut end_line = start_line.split_off(cursor.char);
-    start_line.push_str(&new_clip);
+    let end_line = start_line.split_off_string(cursor.char);
+    start_line.push_str(&edit_clip);
 
     for clip_line in lines.map(|l| l.trim_start()) {
         cursor.line += 1;
         if clip_line.is_empty() {
-            new_clip.push('\n');
+            edit_clip.push('\n');
             content.insert(cursor.line, EditorLine::empty());
             continue;
         }
-        let prefixed = format!("{indent}{clip_line}");
-        let mut new_editor_line = EditorLine::from(prefixed);
+
+        let mut indented = indent.to_owned();
+        indented.push_str(clip_line);
+
+        let mut new_editor_line = EditorLine::new_posix(indented);
         cfg.unindent_if_before_base_pattern(&mut new_editor_line);
-        new_clip = push_on_newline(new_clip, new_editor_line.as_str());
+        edit_clip = push_on_newline(edit_clip, new_editor_line.as_str());
         indent = cfg.derive_indent_from(&new_editor_line);
+
         content.insert(cursor.line, new_editor_line);
     }
 
+    // handle last line
     cursor.line += 1;
-    cursor.char = last_line.char_len() + indent.char_len();
-
-    end_line.insert_str(0, last_line);
-
-    // skipping double indent last line
-    if !end_line.starts_with(&indent) {
-        end_line.insert_str(0, &indent);
-        new_clip = push_on_newline(new_clip, &indent);
+    edit_clip.push('\n');
+    let mut indented = indent;
+    let new_editor_line = if last_line.is_empty() {
+        if end_line.starts_with(&indented) || indented.is_empty() {
+            cursor.char = indented.char_len();
+            EditorLine::new_posix(end_line)
+        // ensure indent matches config
+        } else if indented.starts_with(&cfg.indent) {
+            cursor.char = indented.char_len();
+            indented.push_str(&end_line);
+            let mut new_editor_line = EditorLine::new_posix(indented);
+            let unindent = cfg.unindent_if_before_base_pattern(&mut new_editor_line);
+            cursor.char = cursor.char.saturating_sub(unindent);
+            if let Some(text) = new_editor_line.get_to(cursor.char) {
+                edit_clip.push_str(text);
+            }
+            new_editor_line
+        // backup if current indent does not fix standard indent
+        } else {
+            cursor.char = indented.char_len();
+            edit_clip.push_str(&indented);
+            indented.push_str(&end_line);
+            EditorLine::new_posix(indented)
+        }
     } else {
-        new_clip.push('\n');
-    }
+        indented.push_str(last_line);
+        cursor.char = last_line.char_len(); // set cursor char
+        edit_clip.push_str(&indented);
+        indented.push_str(&end_line); // push end for insert point
+        EditorLine::from(indented)
+    };
+    content.insert(cursor.line, new_editor_line);
 
-    new_clip.push_str(last_line);
-    content.insert(cursor.line, end_line);
-
-    (new_clip, cursor)
+    (edit_clip, cursor)
 }
 
 /// inserts clip with indent
@@ -116,10 +141,12 @@ pub fn insert_lines_indented(
     };
 
     // infering indent if not derived from first line
-    let (mut new_clip, mut indent) = match cursor.char {
+    let (mut edit_clip, mut indent) = match cursor.char {
         0 => {
             let indent = cfg.derive_indent_from_lines(&content[..cursor.line]);
-            (format!("{indent}{}", first_line.trim_start()), indent)
+            let mut new_clip = indent.to_owned();
+            new_clip.push_str(first_line.trim_start());
+            (new_clip, indent)
         }
         pos_char => (
             first_line.trim_start().to_owned(),
@@ -128,41 +155,64 @@ pub fn insert_lines_indented(
     };
 
     let start_line = &mut content[cursor.line];
-    let mut end_line = start_line.split_off(cursor.char);
-    start_line.push_str(&new_clip);
+    let end_line = start_line.split_off_string(cursor.char);
+    start_line.push_str(&edit_clip);
 
     for clip_line in lines.map(|l| l.trim_start()) {
         cursor.line += 1;
         if clip_line.is_empty() {
-            new_clip.push('\n');
+            edit_clip.push('\n');
             content.insert(cursor.line, EditorLine::empty());
             continue;
         }
-        let prefixed = format!("{indent}{clip_line}");
-        let mut new_editor_line = EditorLine::from(prefixed);
+
+        let mut indented = indent.to_owned();
+        indented.push_str(clip_line);
+
+        let mut new_editor_line = EditorLine::new_posix(indented);
         cfg.unindent_if_before_base_pattern(&mut new_editor_line);
-        new_clip = push_on_newline(new_clip, new_editor_line.as_str());
+        edit_clip = push_on_newline(edit_clip, new_editor_line.as_str());
         indent = cfg.derive_indent_from(&new_editor_line);
+
         content.insert(cursor.line, new_editor_line);
     }
 
+    // handle last line
     cursor.line += 1;
-    cursor.char = last_line.char_len() + indent.char_len();
-
-    end_line.insert_str(0, last_line);
-
-    // skipping double indent last line
-    if !end_line.starts_with(&indent) {
-        end_line.insert_str(0, &indent);
-        new_clip = push_on_newline(new_clip, &indent);
+    edit_clip.push('\n');
+    let mut indented = indent;
+    let new_editor_line = if last_line.is_empty() {
+        if end_line.starts_with(&indented) || indented.is_empty() {
+            cursor.char = indented.char_len();
+            EditorLine::new_posix(end_line)
+        // ensure indent matches config
+        } else if indented.starts_with(&cfg.indent) {
+            cursor.char = indented.char_len();
+            indented.push_str(&end_line);
+            let mut new_editor_line = EditorLine::new_posix(indented);
+            let unindent = cfg.unindent_if_before_base_pattern(&mut new_editor_line);
+            cursor.char = cursor.char.saturating_sub(unindent);
+            if let Some(text) = new_editor_line.get_to(cursor.char) {
+                edit_clip.push_str(text);
+            }
+            new_editor_line
+        // backup if current indent does not fix standard indent
+        } else {
+            cursor.char = indented.char_len();
+            edit_clip.push_str(&indented);
+            indented.push_str(&end_line);
+            EditorLine::new_posix(indented)
+        }
     } else {
-        new_clip.push('\n');
-    }
+        indented.push_str(last_line);
+        cursor.char = last_line.char_len(); // set cursor char
+        edit_clip.push_str(&indented);
+        indented.push_str(&end_line); // push end for insert point
+        EditorLine::from(indented)
+    };
+    content.insert(cursor.line, new_editor_line);
 
-    new_clip.push_str(last_line);
-    content.insert(cursor.line, end_line);
-
-    (new_clip, cursor)
+    (edit_clip, cursor)
 }
 
 /// panics if out of bounds
@@ -239,10 +289,10 @@ pub fn get_closing_char_from_context(ch: char, text: &EditorLine, idx: usize) ->
 
 #[inline(always)]
 fn should_close(text: Option<&str>) -> bool {
-    match text.and_then(|text| text.chars().next()) {
-        None => true,
-        Some(text) => text.is_ascii() && !text.is_numeric() && !text.is_alphabetic() && text != '_',
-    }
+    let Some(text) = text.and_then(|text| text.chars().next()) else {
+        return true;
+    };
+    text.is_ascii() && !text.is_numeric() && !text.is_alphabetic() && text != '_'
 }
 
 #[inline(always)]
@@ -259,24 +309,23 @@ pub fn get_opening_char(ch: char) -> Option<char> {
 
 #[inline(always)]
 pub fn is_scope(first_line: &str, second_line: &str) -> bool {
-    if let Some(pair) = first_line
+    let Some(pair) = first_line
         .trim_end()
         .chars()
         .next_back()
         .and_then(|opening| second_line.trim_start().chars().next().map(|closing| (opening, closing)))
-    {
-        return [('{', '}'), ('(', ')'), ('[', ']')].contains(&pair);
-    }
-    false
+    else {
+        return false;
+    };
+    [('{', '}'), ('(', ')'), ('[', ']')].contains(&pair)
 }
 
 #[inline(always)]
 pub fn is_closing_repeat(line: &EditorLine, ch: char, at: usize) -> bool {
-    if let Some(opening) = get_opening_char(ch) {
-        line[at..].starts_with(ch) && line[..at].contains(opening)
-    } else {
-        false
-    }
+    let Some(opening) = get_opening_char(ch) else {
+        return false;
+    };
+    line[at..].starts_with(ch) && line[..at].contains(opening)
 }
 
 #[inline(always)]
@@ -289,6 +338,7 @@ pub fn find_line_start(line: &EditorLine) -> usize {
     0
 }
 
+/// simplified push on new line of componenet
 #[inline(always)]
 fn push_on_newline(mut buf: String, string: &str) -> String {
     buf.push('\n');

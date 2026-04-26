@@ -1,4 +1,5 @@
-use super::{EditorAction, EditorKeyMap, EditorUserKeyMap, FileFamily, FileType};
+use super::{EditorAction, EditorKeyMap, EditorUserKeyMap, FileFamily, FileType, IndentConfigs};
+use crate::editor_line::EditorLine;
 use assert_enum_variants::assert_enum_variants;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::{collections::HashSet, path::PathBuf};
@@ -168,4 +169,22 @@ fn test_editor_key_map_char_mapping() {
     assert_eq!(Some(EditorAction::Char('B')), key_map.map(&l));
     let l = KeyEvent::new(KeyCode::Char('B'), KeyModifiers::SHIFT);
     assert_eq!(Some(EditorAction::Char('B')), key_map.map(&l));
+}
+
+#[test]
+fn test_undent_before_base_pattern_string() {
+    let cfg = IndentConfigs::default();
+    assert_eq!(cfg.indent.as_str(), "    ");
+    let mut text = EditorLine::from("    }");
+    cfg.unindent_if_before_base_pattern(&mut text);
+    assert_eq!("}", text.as_str());
+}
+
+#[test]
+fn test_undent_before_base_pattern() {
+    let cfg = IndentConfigs::default();
+    assert_eq!(cfg.indent.as_str(), "    ");
+    let mut text = "    }".to_owned();
+    cfg.unindent_if_before_base_pattern_string(&mut text);
+    assert_eq!("}", &text);
 }
