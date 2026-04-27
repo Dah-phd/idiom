@@ -13,6 +13,17 @@ pub const SHELL: &str = "sh";
 #[cfg(windows)]
 pub const SHELL: &str = "cmd";
 
+/// Allow faster push text  on new lines with at most 1 alloc
+pub trait StringExt: Sized {
+    /// pushes the text with \n separator
+    fn push_on_new_line(&mut self, text: &str);
+    /// joins the new text to self with \n sep
+    fn join_on_new_line(mut self, text: &str) -> Self {
+        self.push_on_new_line(text);
+        self
+    }
+}
+
 pub struct TrackedList<T> {
     inner: Vec<T>,
     updated: bool,
@@ -418,5 +429,13 @@ pub mod test {
         mut_ref.push('!');
         assert_eq!(mut_ref.as_str(), "tres!");
         assert_eq!(tl.inner, ["tres!"]);
+    }
+}
+
+impl StringExt for String {
+    fn push_on_new_line(&mut self, text: &str) {
+        self.reserve(text.len() + 1); // ensure single alloc
+        self.push('\n');
+        self.push_str(text);
     }
 }
