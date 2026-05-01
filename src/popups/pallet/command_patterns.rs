@@ -254,10 +254,8 @@ fn shell_executor(
             }
             Some((status, logs)) => {
                 match target {
-                    PipeTarget::New => {
-                        if !status.success() {
-                            gs.error(format!("CMD STATUS: {status}"));
-                        }
+                    PipeTarget::New if !status.success() => {
+                        gs.error(format!("CMD STATUS: {status}"));
                     }
                     PipeTarget::Select => {
                         if !status.success() {

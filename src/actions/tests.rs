@@ -681,85 +681,101 @@ fn test_insert_clip() {
 fn test_insert_try_indented() {
     let cfg = IndentConfigs::default();
     let mut content = vec![EditorLine::new_posix("fn test() {}".to_owned())];
-    insert_lines_try_indented("let b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
+    let (t, c) = insert_lines_try_indented("let b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
     // indenting triggers only on start of line
     assert_eq!(content[0].as_str(), "fn test() {let b = 3;");
     assert_eq!(content[1].as_str(), "return b;}");
+    assert_eq!(t.as_str(), "let b = 3;\nreturn b;");
+    assert_eq!(c, CursorPosition::from((1, 9)));
 
     let mut content = vec![
         EditorLine::new_posix("fn test() {".to_owned()),
         EditorLine::new_posix("".to_owned()),
         EditorLine::new_posix("}".to_owned()),
     ];
-    insert_lines_try_indented("let b = 3;\nreturn b;", &cfg, &mut content, (1, 0).into());
+    let (t, c) = insert_lines_try_indented("let b = 3;\nreturn b;", &cfg, &mut content, (1, 0).into());
     assert_eq!(content[0].as_str(), "fn test() {");
     assert_eq!(content[1].as_str(), "    let b = 3;");
     assert_eq!(content[2].as_str(), "    return b;");
     assert_eq!(content[3].as_str(), "}");
+    assert_eq!(t.as_str(), "    let b = 3;\n    return b;");
+    assert_eq!(c, CursorPosition::from((2, 13)));
 
     let mut content = vec![EditorLine::new_posix("fn test() {}".to_owned())];
-    insert_lines_try_indented("\nlet b = 3;\nreturn b;\n", &cfg, &mut content, (0, 11).into());
+    let (t, c) = insert_lines_try_indented("\nlet b = 3;\nreturn b;\n", &cfg, &mut content, (0, 11).into());
     assert_eq!(content[0].as_str(), "fn test() {");
     assert_eq!(content[1].as_str(), "let b = 3;");
     assert_eq!(content[2].as_str(), "return b;");
     assert_eq!(content[3].as_str(), "}");
+    assert_eq!(t.as_str(), "\nlet b = 3;\nreturn b;\n");
+    assert_eq!(c, CursorPosition::from((3, 0)));
 
     let mut content = vec![
         EditorLine::new_posix("fn test() {".to_owned()),
         EditorLine::new_posix("   }".to_owned()),
     ];
-    insert_lines_try_indented("let b = 3;\nreturn b;\n", &cfg, &mut content, (1, 3).into());
-
+    let (t, c) = insert_lines_try_indented("let b = 3;\nreturn b;\n", &cfg, &mut content, (1, 3).into());
     assert_eq!(content[0].as_str(), "fn test() {");
     assert_eq!(content[1].as_str(), "   let b = 3;");
     assert_eq!(content[2].as_str(), "return b;");
-    assert_eq!(content[3].as_str(), "}")
+    assert_eq!(content[3].as_str(), "}");
+    assert_eq!(t.as_str(), "let b = 3;\nreturn b;\n");
+    assert_eq!(c, CursorPosition::from((3, 0)));
 }
 
 #[test]
 fn test_insert_indented() {
     let cfg = IndentConfigs::default();
     let mut content = vec![EditorLine::new_posix("fn test() {}".to_owned())];
-    insert_lines_indented("let b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
+    let (t, c) = insert_lines_indented("let b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
     // indenting triggers ignoring postion
     assert_eq!(content[0].as_str(), "fn test() {let b = 3;");
     assert_eq!(content[1].as_str(), "    return b;}");
-    let cfg = IndentConfigs::default();
+    assert_eq!(t.as_str(), "let b = 3;\n    return b;");
+    assert_eq!(c, CursorPosition::from((1, 13)));
+
     let mut content = vec![EditorLine::new_posix("fn test() {}".to_owned())];
-    insert_lines_indented("\nlet b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
+    let (t, c) = insert_lines_indented("\nlet b = 3;\nreturn b;", &cfg, &mut content, (0, 11).into());
     // indenting triggers only on start of line
     assert_eq!(content[0].as_str(), "fn test() {");
     assert_eq!(content[1].as_str(), "    let b = 3;");
     assert_eq!(content[2].as_str(), "    return b;}");
+    assert_eq!(t.as_str(), "\n    let b = 3;\n    return b;");
+    assert_eq!(c, CursorPosition::from((2, 13)));
 
     let mut content = vec![
         EditorLine::new_posix("fn test() {".to_owned()),
         EditorLine::new_posix("".to_owned()),
         EditorLine::new_posix("}".to_owned()),
     ];
-    insert_lines_indented("let b = 3;\nreturn b;", &cfg, &mut content, (1, 0).into());
+    let (t, c) = insert_lines_indented("let b = 3;\nreturn b;", &cfg, &mut content, (1, 0).into());
     assert_eq!(content[0].as_str(), "fn test() {");
     assert_eq!(content[1].as_str(), "    let b = 3;");
     assert_eq!(content[2].as_str(), "    return b;");
     assert_eq!(content[3].as_str(), "}");
+    assert_eq!(t.as_str(), "    let b = 3;\n    return b;");
+    assert_eq!(c, CursorPosition::from((2, 13)));
 
     let mut content = vec![EditorLine::new_posix("fn test() {}".to_owned())];
-    insert_lines_indented("\nlet b = 3;\nreturn b;\n", &cfg, &mut content, (0, 11).into());
+    let (t, c) = insert_lines_indented("\nlet b = 3;\nreturn b;\n", &cfg, &mut content, (0, 11).into());
     assert_eq!(content[0].as_str(), "fn test() {");
     assert_eq!(content[1].as_str(), "    let b = 3;");
     assert_eq!(content[2].as_str(), "    return b;");
     assert_eq!(content[3].as_str(), "}");
+    assert_eq!(t.as_str(), "\n    let b = 3;\n    return b;\n");
+    assert_eq!(c, CursorPosition::from((3, 0)));
 
     let mut content = vec![
         EditorLine::new_posix("fn test() {".to_owned()),
         EditorLine::new_posix("   }".to_owned()),
     ];
-    insert_lines_indented("let b = 3;\nreturn b;\n", &cfg, &mut content, (1, 3).into());
-
+    let (t, c) = insert_lines_indented("let b = 3;\nreturn b;\n", &cfg, &mut content, (1, 3).into());
     assert_eq!(content[0].as_str(), "fn test() {");
     assert_eq!(content[1].as_str(), "   let b = 3;");
     assert_eq!(content[2].as_str(), "   return b;");
     assert_eq!(content[3].as_str(), "}");
+    assert_eq!(t.as_str(), "let b = 3;\n   return b;\n");
+    assert_eq!(c, CursorPosition::from((3, 0)));
 }
 
 #[test]

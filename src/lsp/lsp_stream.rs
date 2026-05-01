@@ -47,7 +47,7 @@ impl JsonRPC {
             stderr: tokio::spawn(async move {
                 let mut buffer = Vec::new();
                 while let Some(Ok(err)) = stderr.next().await {
-                    buffer.extend(err.into_iter());
+                    buffer.extend(err);
                     if let Ok(msg) = std::str::from_utf8(&buffer) {
                         into_guard(&errors_handler).push(msg.to_owned());
                         buffer.clear();
@@ -70,7 +70,7 @@ impl JsonRPC {
         }
         while self.parsed_que.is_empty() {
             let bytes = self.inner.next().await.ok_or(RCPError::StreamFinish)??;
-            self.buffer.extend(bytes.into_iter());
+            self.buffer.extend(bytes);
 
             if let Ok(msg) = std::str::from_utf8(&self.buffer) {
                 self.str_buffer.push_str(msg);

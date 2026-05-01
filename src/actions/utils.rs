@@ -106,7 +106,6 @@ pub fn insert_lines_try_indented(
             new_editor_line
             // backup if current indent does not fit standard indent
         } else {
-            cursor.char = indented.char_len();
             if cfg.has_unindent_pattern(&end_line) {
                 if cfg.indent.len() > indented.len() {
                     indented.clear();
@@ -114,16 +113,19 @@ pub fn insert_lines_try_indented(
                     indented.replace_range(..to_range, "");
                 }
             }
-            edit_clip.push_on_new_line(&indented);
-            indented.push_str(&end_line);
-            EditorLine::new_posix(indented)
+            let mut new_editor_line = EditorLine::new_posix(indented);
+            cursor.char = new_editor_line.char_len();
+            edit_clip.push_on_new_line(new_editor_line.as_str());
+            new_editor_line.push_str(&end_line);
+            new_editor_line
         }
     } else {
         indented.push_str(last_line);
-        cursor.char = last_line.char_len(); // set cursor char
-        edit_clip.push_on_new_line(&indented);
-        indented.push_str(&end_line); // push end for insert point
-        EditorLine::from(indented)
+        let mut new_editor_line = EditorLine::new_posix(indented);
+        cursor.char = new_editor_line.char_len(); // set cursor char
+        edit_clip.push_on_new_line(new_editor_line.as_str());
+        new_editor_line.push_str(&end_line); // push end for insert point
+        new_editor_line
     };
     content.insert(cursor.line, new_editor_line);
     (edit_clip, cursor)
@@ -204,7 +206,6 @@ pub fn insert_lines_indented(
             new_editor_line
         // backup if current indent does not fit standard indent
         } else {
-            cursor.char = indented.char_len();
             if cfg.has_unindent_pattern(&end_line) {
                 if cfg.indent.len() > indented.len() {
                     indented.clear();
@@ -212,16 +213,19 @@ pub fn insert_lines_indented(
                     indented.replace_range(..to_range, "");
                 }
             }
-            edit_clip.push_on_new_line(&indented);
-            indented.push_str(&end_line);
-            EditorLine::new_posix(indented)
+            let mut new_editor_line = EditorLine::new_posix(indented);
+            cursor.char = new_editor_line.char_len();
+            edit_clip.push_on_new_line(new_editor_line.as_str());
+            new_editor_line.push_str(&end_line);
+            new_editor_line
         }
     } else {
         indented.push_str(last_line);
-        cursor.char = last_line.char_len(); // set cursor char
-        edit_clip.push_on_new_line(&indented);
-        indented.push_str(&end_line); // push end for insert point
-        EditorLine::from(indented)
+        let mut new_editor_line = EditorLine::new_posix(indented);
+        cursor.char = new_editor_line.char_len(); // set cursor char
+        edit_clip.push_on_new_line(new_editor_line.as_str());
+        new_editor_line.push_str(&end_line); // push end for insert point
+        new_editor_line
     };
     content.insert(cursor.line, new_editor_line);
     (edit_clip, cursor)

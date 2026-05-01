@@ -224,7 +224,7 @@ impl Pallet {
             *score = gs.matcher.fuzzy_match(cmd.label, self.pattern.as_str()).unwrap_or(i64::MAX);
         }
         self.state.select(0, self.commands.len());
-        self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
+        self.commands.sort_by_key(|(score, _)| *score);
     }
 
     fn get_command_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
