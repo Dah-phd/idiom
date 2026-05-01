@@ -15,6 +15,10 @@ pub const SHELL: &str = "cmd";
 
 /// Allow faster push text  on new lines with at most 1 alloc
 pub trait StringExt: Sized {
+    /// returns self with added suffix
+    fn suffixed(self, suf: char) -> Self;
+    /// returns self with added suffix
+    fn suffixed_str(self, suf: &str) -> Self;
     /// pushes the text with \n separator
     fn push_on_new_line(&mut self, text: &str);
     /// joins the new text to self with \n sep
@@ -433,9 +437,22 @@ pub mod test {
 }
 
 impl StringExt for String {
+    #[inline]
     fn push_on_new_line(&mut self, text: &str) {
         self.reserve(text.len() + 1); // ensure single alloc
         self.push('\n');
         self.push_str(text);
+    }
+
+    #[inline(always)]
+    fn suffixed(mut self, suf: char) -> Self {
+        self.push(suf);
+        self
+    }
+
+    #[inline(always)]
+    fn suffixed_str(mut self, suf: &str) -> Self {
+        self.push_str(suf);
+        self
     }
 }

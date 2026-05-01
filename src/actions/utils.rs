@@ -1,7 +1,7 @@
 use crate::{configs::IndentConfigs, cursor::CursorPosition, editor_line::EditorLine, utils::StringExt};
 use idiom_tui::UTFSafe;
 
-#[inline(always)]
+#[inline]
 pub fn insert_clip(clip: &str, content: &mut Vec<EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
     let mut lines = clip.split('\n');
     let first_line = lines.next().expect("first line should exist!");
@@ -31,7 +31,7 @@ pub fn insert_clip(clip: &str, content: &mut Vec<EditorLine>, mut cursor: Cursor
 
 // TODO: refactor - maybe merge partial with insert_lines_indented
 /// inserts clip with indent if possible
-#[inline(always)]
+#[inline]
 pub fn insert_lines_try_indented(
     clip: &str,
     cfg: &IndentConfigs,
@@ -59,6 +59,7 @@ pub fn insert_lines_try_indented(
         edit_clip.push_str(first_line.trim_start());
         return finalize_insert_indented(indent, (lines, last_line), edit_clip, cfg, content, cursor);
     }
+
     let indent = start_indent.to_string();
     let edit_clip = first_line.trim_start().to_owned();
     finalize_insert_indented(indent, (lines, last_line), edit_clip, cfg, content, cursor)
@@ -66,7 +67,7 @@ pub fn insert_lines_try_indented(
 
 // TODO: refactor - maybe merge partial with insert_lines_try_indented
 /// inserts clip with indent
-#[inline(always)]
+#[inline]
 pub fn insert_lines_indented(
     clip: &str,
     cfg: &IndentConfigs,
@@ -89,6 +90,7 @@ pub fn insert_lines_indented(
         edit_clip.push_str(first_line.trim_start());
         return finalize_insert_indented(indent, (lines, last_line), edit_clip, cfg, content, cursor);
     }
+
     let indent = cfg.derive_indent_from_str(content[cursor.line].get_to(cursor.char).expect("checked within cursor!"));
     let edit_clip = first_line.trim_start().to_owned();
     finalize_insert_indented(indent, (lines, last_line), edit_clip, cfg, content, cursor)
@@ -96,6 +98,7 @@ pub fn insert_lines_indented(
 
 /// helper to abstract the branching of indenting
 /// not logical but manages to share the logic between try and forced intedent
+#[inline]
 fn finalize_insert_indented(
     mut indent: String,
     (lines, last_line): (std::str::Split<'_, char>, &str),
@@ -120,60 +123,62 @@ fn finalize_insert_indented(
 
         let mut new_editor_line = EditorLine::new_posix(indented);
         cfg.unindent_if_before_base_pattern(&mut new_editor_line);
-        edit_clip.push('\n');
-        edit_clip.push_str(new_editor_line.as_str());
+        edit_clip.push_on_new_line(new_editor_line.as_str());
         indent = cfg.derive_indent_from(&new_editor_line);
 
         content.insert(cursor.line, new_editor_line);
     }
 
     cursor.line += 1;
-    let mut indented = indent;
-    let new_editor_line = if last_line.is_empty() {
-        if end_line.starts_with(&indented) || indented.is_empty() {
-            edit_clip.push('\n');
-            cursor.char = indented.char_len();
-            EditorLine::new_posix(end_line)
-        // ensure indent matches config
-        } else if indented.starts_with(&cfg.indent) {
-            cursor.char = indented.char_len();
-            indented.push_str(&end_line);
-            let mut new_editor_line = EditorLine::new_posix(indented);
-            let unindent = cfg.unindent_if_before_base_pattern(&mut new_editor_line);
-            cursor.char = cursor.char.saturating_sub(unindent);
-            if let Some(text) = new_editor_line.get_to(cursor.char) {
-                edit_clip.push_on_new_line(text);
-            }
-            new_editor_line
-        // backup if current indent does not fit standard indent
-        } else {
-            if cfg.has_unindent_pattern(&end_line) {
-                if cfg.indent.len() > indented.len() {
-                    indented.clear();
-                } else if let Some((to_range, _)) = indented.char_indices().take(cfg.indent.len() + 1).last() {
-                    indented.replace_range(..to_range, "");
-                }
-            }
-            let mut new_editor_line = EditorLine::new_posix(indented);
-            cursor.char = new_editor_line.char_len();
-            edit_clip.push_on_new_line(new_editor_line.as_str());
-            new_editor_line.push_str(&end_line);
-            new_editor_line
-        }
-    } else {
-        indented.push_str(last_line);
-        let mut new_editor_line = EditorLine::new_posix(indented);
+
+    // clip ends with \n
+    if !last_line.is_empty() {
+        let mut new_editor_line = EditorLine::new_posix(indent.suffixed_str(last_line));
         cursor.char = new_editor_line.char_len(); // set cursor char
         edit_clip.push_on_new_line(new_editor_line.as_str());
         new_editor_line.push_str(&end_line); // push end for insert point
-        new_editor_line
+        content.insert(cursor.line, new_editor_line);
+        return (edit_clip, cursor);
+    }
+
+    // indent already in line
+    if end_line.starts_with(&indent) || indent.is_empty() {
+        cursor.char = indent.char_len();
+        content.insert(cursor.line, EditorLine::new_posix(end_line));
+        return (edit_clip.suffixed('\n'), cursor);
+    }
+
+    // general indent flow
+    if indent.starts_with(&cfg.indent) {
+        cursor.char = indent.char_len();
+        let mut new_editor_line = EditorLine::new_posix(indent.suffixed_str(&end_line));
+        let unindent = cfg.unindent_if_before_base_pattern(&mut new_editor_line);
+        cursor.char = cursor.char.saturating_sub(unindent);
+        if let Some(text) = new_editor_line.get_to(cursor.char) {
+            edit_clip.push_on_new_line(text);
+        }
+        content.insert(cursor.line, new_editor_line);
+        return (edit_clip, cursor);
     };
+
+    // backup if current indent does not fit standard indent
+    if cfg.has_unindent_pattern(&end_line) {
+        if cfg.indent.len() > indent.len() {
+            indent.clear();
+        } else if let Some((to_range, _)) = indent.char_indices().take(cfg.indent.len() + 1).last() {
+            indent.replace_range(..to_range, "");
+        }
+    }
+    let mut new_editor_line = EditorLine::new_posix(indent);
+    cursor.char = new_editor_line.char_len();
+    edit_clip.push_on_new_line(new_editor_line.as_str());
+    new_editor_line.push_str(&end_line);
     content.insert(cursor.line, new_editor_line);
     (edit_clip, cursor)
 }
 
 /// panics if out of bounds
-#[inline(always)]
+#[inline]
 pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<EditorLine>) -> String {
     if from.line == to.line {
         let line = &mut content[from.line];
@@ -193,7 +198,7 @@ pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<
 }
 
 /// panics if range is out of bounds
-#[inline(always)]
+#[inline]
 pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<EditorLine>) {
     if from.line == to.line {
         match content.get_mut(from.line) {
@@ -206,7 +211,7 @@ pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Ve
     content[from.line].replace_from(from.char, &last_line[to.char..]);
 }
 
-#[inline(always)]
+#[inline]
 pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[EditorLine]) -> String {
     if from.line == to.line {
         return content[from.line][from.char..to.char].to_owned();
