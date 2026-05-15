@@ -1,8 +1,12 @@
 use super::{
-    Actions, BUFFER, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileType, GlobalState,
-    Lexer, TuiCodec, controls::ControlMap,
+    Actions, BUFFER, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileType, Lexer, TuiCodec,
+    controls::ControlMap,
 };
-use crate::error::{IdiomError, IdiomResult};
+use crate::{
+    error::{IdiomError, IdiomResult},
+    global_state::GlobalState,
+    popups::generic_popup::BasicConfirmPopup,
+};
 use std::{
     os::unix::fs::MetadataExt,
     path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR, Path, PathBuf},
@@ -30,12 +34,61 @@ pub fn build_display(path: &Path) -> String {
 }
 
 /// reject files over 50mb
-pub fn big_file_protection(path: &Path) -> IdiomResult<()> {
-    let meta = std::fs::metadata(path)?;
-    if meta.size() > 50 * 1024 * 1024 {
-        return Err(IdiomError::io_other("File over 50MB"));
+pub struct BigFileCheck(bool);
+
+impl BasicConfirmPopup for BigFileCheck {
+    type R = ();
+
+    fn render(&mut self, gs: &mut GlobalState) {
+        use crate::ext_tui::StyleExt;
+        use crossterm::style::ContentStyle;
+
+        let mut lines = gs.editor_area().modal_relative(2, 2, 60, 12).into_iter();
+        let Some(line) = lines.next() else { return };
+        line.render("File is over 50Mi, confirm load?", gs.backend());
+        let Some(line) = lines.next() else { return };
+        let (confirm_style, deny_style) = match self.0 {
+            true => (ContentStyle::reversed(), ContentStyle::default()),
+            false => (ContentStyle::default(), ContentStyle::reversed()),
+        };
+        line.render_styled("    Confirm (y)", confirm_style, gs.backend());
+        let Some(line) = lines.next() else { return };
+        line.render_styled("    Cancel (n)", deny_style, gs.backend());
     }
-    Ok(())
+
+    fn clear_screen(&self, gs: &mut GlobalState) {
+        let rect = *gs.editor_area();
+        rect.clear(gs.backend());
+    }
+
+    fn return_select(self) -> IdiomResult<()> {
+        if !self.0 {
+            return Err(self.cancel_err());
+        }
+        Ok(())
+    }
+
+    fn cancel_err(&self) -> IdiomError {
+        IdiomError::GeneralError("File open canceled > size over 50Mi".into())
+    }
+
+    fn next_option(&mut self) {
+        self.0 = !self.0
+    }
+
+    fn prev_option(&mut self) {
+        self.0 = !self.0
+    }
+}
+
+impl BigFileCheck {
+    pub fn confirm(path: &Path, gs: &mut GlobalState) -> IdiomResult<()> {
+        let meta = std::fs::metadata(path)?;
+        if meta.size() < 1024 {
+            return Ok(());
+        }
+        Self(false).run(gs)
+    }
 }
 
 /// calculates the max digits for line number

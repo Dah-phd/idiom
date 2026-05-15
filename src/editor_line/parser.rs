@@ -1,7 +1,8 @@
 use crate::{
     editor_line::EditorLine,
     error::{IdiomError, IdiomResult},
-    global_state::{GlobalState, IdiomEvent},
+    global_state::GlobalState,
+    popups::generic_popup::BasicConfirmPopup,
 };
 use logos::Logos;
 
@@ -25,190 +26,6 @@ pub const RECORD_END: LineEnd = LineEnd { text: "\u{001E}", char: '®' };
 
 const BACKSPACE: char = '\u{0008}';
 const ESC: char = '\u{001B}';
-
-#[derive(Debug, Default)]
-pub struct ParsedLines<'a> {
-    content: Vec<(&'a str, LineEnd)>,
-    tabs: Vec<usize>,
-    /// anything below is unlikely to happen
-    non_posix_line_ends: bool,
-    replaced_esc_cc: Vec<usize>,
-    replaced_backspaces_cc: Vec<usize>,
-}
-
-impl ParsedLines<'_> {
-    pub fn into_content_or_popup_if_not_formatted(
-        self,
-        indent: &str,
-        gs: &mut GlobalState,
-    ) -> IdiomResult<Vec<EditorLine>> {
-        if self.is_formatted() || !self.popup_confirm_sanitize(gs)? {
-            return Ok(self.into_editor_lines());
-        }
-        Ok(self.into_sanitzed_editor_lines(indent))
-    }
-
-    pub fn into_editor_lines(self) -> Vec<EditorLine> {
-        self.transform_to_editor_lines(EditorLine::new)
-    }
-
-    pub fn into_sanitzed_editor_lines(mut self, indent: &str) -> Vec<EditorLine> {
-        if self.tabs.is_empty() {
-            return self.transform_to_editor_lines(|text, _| EditorLine::new_posix(text));
-        }
-        let tabs = std::mem::take(&mut self.tabs);
-        let mut idx = 0;
-        self.transform_to_editor_lines(|mut text, _| {
-            if tabs.contains(&idx) {
-                text = text.replace('\t', indent);
-            }
-            idx += 1;
-            EditorLine::new_posix(text)
-        })
-    }
-
-    pub fn is_formatted(&self) -> bool {
-        self.tabs.is_empty() && !self.non_posix_line_ends
-    }
-
-    /// ensures that no restricted control chars are present
-    /// removing restricted control chars is unlikely
-    fn transform_to_editor_lines(self, mut cb: impl FnMut(String, LineEnd) -> EditorLine) -> Vec<EditorLine> {
-        let ParsedLines { content, replaced_esc_cc, replaced_backspaces_cc, .. } = self;
-        match (replaced_esc_cc.is_empty(), replaced_backspaces_cc.is_empty()) {
-            (true, true) => content.into_iter().map(|(text, end)| (cb)(text.into(), end)).collect(),
-            (true, false) => content
-                .into_iter()
-                .enumerate()
-                .map(|(idx, (text, end))| {
-                    let mut text = text.to_owned();
-                    if replaced_backspaces_cc.contains(&idx) {
-                        text.retain(|c| c != BACKSPACE);
-                    };
-                    (cb)(text, end)
-                })
-                .collect(),
-            (false, true) => content
-                .into_iter()
-                .enumerate()
-                .map(|(idx, (text, end))| {
-                    let mut text = text.to_owned();
-                    if replaced_esc_cc.contains(&idx) {
-                        text.retain(|c| c != ESC);
-                    };
-                    (cb)(text, end)
-                })
-                .collect(),
-            (false, false) => content
-                .into_iter()
-                .enumerate()
-                .map(|(idx, (text, end))| {
-                    let mut text = text.to_owned();
-                    match (replaced_esc_cc.contains(&idx), replaced_backspaces_cc.contains(&idx)) {
-                        (true, true) => text.retain(|c| c != ESC && c != BACKSPACE),
-                        (false, true) => text.retain(|c| c != BACKSPACE),
-                        (true, false) => text.retain(|c| c != ESC),
-                        (false, false) => (),
-                    };
-                    (cb)(text, end)
-                })
-                .collect(),
-        }
-    }
-
-    fn popup_confirm_sanitize(&self, gs: &mut GlobalState) -> IdiomResult<bool> {
-        use crossterm::event::{Event, KeyCode, KeyEvent};
-        gs.force_screen_rebuild();
-        let area = *gs.editor_area();
-        area.clear(gs.backend());
-        let mut choice = 0;
-        self.render_popup(choice, gs);
-        loop {
-            if crossterm::event::poll(std::time::Duration::from_millis(250))? {
-                match crossterm::event::read()? {
-                    Event::Resize(width, height) => {
-                        gs.event.push(IdiomEvent::Resize { width, height });
-                        return Err(IdiomError::GeneralError("File open canceled due to screen resize!".into()));
-                    }
-                    Event::Key(KeyEvent { code: KeyCode::Esc, .. }) => break,
-                    Event::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
-                        return match choice {
-                            0 => Ok(true),
-                            1 => Ok(false),
-                            _ => break,
-                        };
-                    }
-                    Event::Key(KeyEvent { code: KeyCode::Up, .. }) => {
-                        choice = choice.checked_sub(1).unwrap_or(2);
-                    }
-                    Event::Key(KeyEvent { code: KeyCode::Down, .. }) => {
-                        choice = match choice > 1 {
-                            true => 0,
-                            false => choice + 1,
-                        };
-                    }
-                    _ => {}
-                }
-                self.render_popup(choice, gs);
-            }
-        }
-        Err(IdiomError::GeneralError("File open canceled manually!".into()))
-    }
-
-    fn render_popup(&self, choice: usize, gs: &mut GlobalState) {
-        use crate::ext_tui::StyleExt;
-        use crossterm::style::{Color, ContentStyle};
-        use idiom_tui::Backend;
-
-        let mut lines = gs.editor_area().modal_relative(2, 2, 60, 12).into_iter();
-        let Some(line) = lines.next() else { return };
-        line.render_styled("Found unexpected formatting:", ContentStyle::bold(), gs.backend());
-        let Some(line) = lines.next() else { return };
-        match self.tabs.is_empty() {
-            true => line.render("    Used tabs instead of space indent: N/A", gs.backend()),
-            false => line.render_styled(
-                "    Used tabs instead of space indent: present!",
-                ContentStyle::bold(),
-                gs.backend(),
-            ),
-        };
-        let Some(line) = lines.next() else { return };
-        match self.non_posix_line_ends {
-            true => line.render_styled("    Used non posix line ends: present!", ContentStyle::bold(), gs.backend()),
-            false => line.render("    Used non posix line ends: N/A", gs.backend()),
-        };
-        let Some(line) = lines.next() else { return };
-        line.render_styled("Handle choices:", ContentStyle::bold(), gs.backend());
-        for (choice_idx, text) in ["sanitize", "do not sanitize - load as is", "cancel"].iter().enumerate() {
-            let Some(line) = lines.next() else { return };
-            match choice == choice_idx {
-                true => {
-                    line.render_styled(&format!(" >> {text}"), ContentStyle::reversed(), gs.backend());
-                }
-                false => {
-                    line.render(&format!("    {text}"), gs.backend());
-                }
-            }
-        }
-        if !self.replaced_esc_cc.is_empty() {
-            let Some(line) = lines.next() else { return };
-            line.render_styled(
-                "Found U+001B ESC Control char -> will be stripped from text!",
-                ContentStyle::bold().with_fg(Color::Red),
-                gs.backend(),
-            );
-        }
-        if !self.replaced_backspaces_cc.is_empty() {
-            let Some(line) = lines.next() else { return };
-            line.render_styled(
-                "Found U+0008 BACKSPACE Control char -> will be stripped from text!",
-                ContentStyle::bold().with_fg(Color::Red),
-                gs.backend(),
-            );
-        }
-        gs.backend().flush_buf();
-    }
-}
 
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Debug, Logos, PartialEq)]
@@ -330,4 +147,203 @@ impl LineParser {
         }
         result
     }
+}
+
+#[derive(Default)]
+pub struct ParsedLines<'a> {
+    content: Vec<(&'a str, LineEnd)>,
+    tabs: Vec<usize>,
+    /// anything below is unlikely to happen
+    non_posix_line_ends: bool,
+    replaced_esc_cc: Vec<usize>,
+    replaced_backspaces_cc: Vec<usize>,
+}
+
+impl ParsedLines<'_> {
+    pub fn into_content_or_popup_if_not_formatted(
+        self,
+        indent: &str,
+        gs: &mut GlobalState,
+    ) -> IdiomResult<Vec<EditorLine>> {
+        if self.is_formatted() {
+            return Ok(self.into_editor_lines());
+        }
+        ConfirmParsedLoading { load_option: LoadingType::Sanitized, parsed: self, indent }.run(gs)
+    }
+
+    pub fn into_editor_lines(self) -> Vec<EditorLine> {
+        self.transform_to_editor_lines(EditorLine::new)
+    }
+
+    pub fn into_sanitzed_editor_lines(mut self, indent: &str) -> Vec<EditorLine> {
+        if self.tabs.is_empty() {
+            return self.transform_to_editor_lines(|text, _| EditorLine::new_posix(text));
+        }
+        let tabs = std::mem::take(&mut self.tabs);
+        let mut idx = 0;
+        self.transform_to_editor_lines(|mut text, _| {
+            if tabs.contains(&idx) {
+                text = text.replace('\t', indent);
+            }
+            idx += 1;
+            EditorLine::new_posix(text)
+        })
+    }
+
+    pub fn is_formatted(&self) -> bool {
+        self.tabs.is_empty() && !self.non_posix_line_ends
+    }
+
+    /// ensures that no restricted control chars are present
+    /// removing restricted control chars is unlikely
+    fn transform_to_editor_lines(self, mut cb: impl FnMut(String, LineEnd) -> EditorLine) -> Vec<EditorLine> {
+        let ParsedLines { content, replaced_esc_cc, replaced_backspaces_cc, .. } = self;
+        match (replaced_esc_cc.is_empty(), replaced_backspaces_cc.is_empty()) {
+            (true, true) => content.into_iter().map(|(text, end)| (cb)(text.into(), end)).collect(),
+            (true, false) => content
+                .into_iter()
+                .enumerate()
+                .map(|(idx, (text, end))| {
+                    let mut text = text.to_owned();
+                    if replaced_backspaces_cc.contains(&idx) {
+                        text.retain(|c| c != BACKSPACE);
+                    };
+                    (cb)(text, end)
+                })
+                .collect(),
+            (false, true) => content
+                .into_iter()
+                .enumerate()
+                .map(|(idx, (text, end))| {
+                    let mut text = text.to_owned();
+                    if replaced_esc_cc.contains(&idx) {
+                        text.retain(|c| c != ESC);
+                    };
+                    (cb)(text, end)
+                })
+                .collect(),
+            (false, false) => content
+                .into_iter()
+                .enumerate()
+                .map(|(idx, (text, end))| {
+                    let mut text = text.to_owned();
+                    match (replaced_esc_cc.contains(&idx), replaced_backspaces_cc.contains(&idx)) {
+                        (true, true) => text.retain(|c| c != ESC && c != BACKSPACE),
+                        (false, true) => text.retain(|c| c != BACKSPACE),
+                        (true, false) => text.retain(|c| c != ESC),
+                        (false, false) => (),
+                    };
+                    (cb)(text, end)
+                })
+                .collect(),
+        }
+    }
+}
+
+struct ConfirmParsedLoading<'a> {
+    parsed: ParsedLines<'a>,
+    load_option: LoadingType,
+    indent: &'a str,
+}
+
+impl<'a> BasicConfirmPopup for ConfirmParsedLoading<'a> {
+    type R = Vec<EditorLine>;
+
+    fn render(&mut self, gs: &mut GlobalState) {
+        use crate::ext_tui::StyleExt;
+        use crossterm::style::{Color, ContentStyle};
+
+        let mut lines = gs.editor_area().modal_relative(2, 2, 60, 12).into_iter();
+        let Some(line) = lines.next() else { return };
+        line.render_styled("Found unexpected formatting:", ContentStyle::bold(), gs.backend());
+        let Some(line) = lines.next() else { return };
+        match self.parsed.tabs.is_empty() {
+            true => line.render("    Used tabs instead of space indent: N/A", gs.backend()),
+            false => line.render_styled(
+                "    Used tabs instead of space indent: present!",
+                ContentStyle::bold(),
+                gs.backend(),
+            ),
+        };
+        let Some(line) = lines.next() else { return };
+        match self.parsed.non_posix_line_ends {
+            true => line.render_styled("    Used non posix line ends: present!", ContentStyle::bold(), gs.backend()),
+            false => line.render("    Used non posix line ends: N/A", gs.backend()),
+        };
+        let Some(line) = lines.next() else { return };
+        line.render_styled("Handle choices:", ContentStyle::bold(), gs.backend());
+        let choice = match self.load_option {
+            LoadingType::Sanitized => 0,
+            LoadingType::LoadAsIs => 1,
+            LoadingType::Cancel => 2,
+        };
+        for (choice_idx, text) in ["sanitize", "do not sanitize - load as is", "cancel"].iter().enumerate() {
+            let Some(line) = lines.next() else { return };
+            match choice == choice_idx {
+                true => {
+                    line.render_styled(&format!(" >> {text}"), ContentStyle::reversed(), gs.backend());
+                }
+                false => {
+                    line.render(&format!("    {text}"), gs.backend());
+                }
+            }
+        }
+        if !self.parsed.replaced_esc_cc.is_empty() {
+            let Some(line) = lines.next() else { return };
+            line.render_styled(
+                "Found U+001B ESC Control char -> will be stripped from text!",
+                ContentStyle::bold().with_fg(Color::Red),
+                gs.backend(),
+            );
+        }
+        if !self.parsed.replaced_backspaces_cc.is_empty() {
+            let Some(line) = lines.next() else { return };
+            line.render_styled(
+                "Found U+0008 BACKSPACE Control char -> will be stripped from text!",
+                ContentStyle::bold().with_fg(Color::Red),
+                gs.backend(),
+            );
+        }
+    }
+
+    fn next_option(&mut self) {
+        self.load_option = match self.load_option {
+            LoadingType::Sanitized => LoadingType::LoadAsIs,
+            LoadingType::LoadAsIs => LoadingType::Cancel,
+            LoadingType::Cancel => LoadingType::Sanitized,
+        }
+    }
+
+    fn prev_option(&mut self) {
+        self.load_option = match self.load_option {
+            LoadingType::Sanitized => LoadingType::Cancel,
+            LoadingType::LoadAsIs => LoadingType::Sanitized,
+            LoadingType::Cancel => LoadingType::LoadAsIs,
+        }
+    }
+
+    fn clear_screen(&self, gs: &mut GlobalState) {
+        let rect = *gs.editor_area();
+        rect.clear(gs.backend());
+    }
+
+    fn cancel_err(&self) -> IdiomError {
+        IdiomError::GeneralError("File open canceled manually!".into())
+    }
+
+    fn return_select(self) -> IdiomResult<Self::R> {
+        match self.load_option {
+            LoadingType::Sanitized => Ok(self.parsed.into_sanitzed_editor_lines(self.indent)),
+            LoadingType::LoadAsIs => Ok(self.parsed.into_editor_lines()),
+            LoadingType::Cancel => Err(self.cancel_err()),
+        }
+    }
+}
+
+#[derive(Default)]
+enum LoadingType {
+    #[default]
+    Sanitized,
+    LoadAsIs,
+    Cancel,
 }

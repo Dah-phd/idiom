@@ -23,11 +23,10 @@ use std::{
     path::PathBuf,
 };
 use syntax::Lexer;
-pub use utils::{EditorStats, editor_from_data};
 use utils::{
-    big_file_protection, build_display, calc_line_number_offset, select_between_chars, select_between_chars_inc,
-    select_indent,
+    BigFileCheck, build_display, calc_line_number_offset, select_between_chars, select_between_chars_inc, select_indent,
 };
+pub use utils::{EditorStats, editor_from_data};
 
 const FILE_UPDATED_VERSION: i32 = -1;
 const BUFFER: i32 = -2;
@@ -54,7 +53,7 @@ impl Editor {
     }
 
     pub fn new(path: PathBuf, file_type: FileType, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
-        big_file_protection(&path)?;
+        BigFileCheck::confirm(&path, gs)?;
         let indent_cfg = cfg.get_indent_cfg(file_type);
         let text = std::fs::read_to_string(&path)?;
         let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg.indent, gs)?;
@@ -416,7 +415,7 @@ impl Editor {
     }
 
     pub fn rebase(&mut self, gs: &mut GlobalState) {
-        if let Err(error) = big_file_protection(&self.path) {
+        if let Err(error) = BigFileCheck::confirm(&self.path, gs) {
             gs.error(format!("Failed to load file {error}"));
             return;
         };

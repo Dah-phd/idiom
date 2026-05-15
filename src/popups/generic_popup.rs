@@ -1,7 +1,8 @@
 use crate::{
     embeded_term::EditorTerminal,
+    error::{IdiomError, IdiomResult},
     ext_tui::{CrossTerm, StyleExt, text_field::map_key},
-    global_state::GlobalState,
+    global_state::{GlobalState, IdiomEvent},
     popups::{Components, Popup, Status},
     tree::Tree,
     workspace::Workspace,
@@ -11,6 +12,7 @@ use crossterm::{
     style::ContentStyle,
 };
 use idiom_tui::{
+    Backend,
     layout::Line,
     text_field::{Status as InputStatus, TextField},
 };
@@ -241,6 +243,46 @@ impl PopupChoice {
             self.button_ranges.push(but_range)
         }
     }
+}
+
+pub trait BasicConfirmPopup: Sized {
+    type R;
+    fn run(mut self, gs: &mut GlobalState) -> IdiomResult<Self::R> {
+        use crossterm::event::{Event, KeyCode, KeyEvent};
+        gs.force_screen_rebuild();
+        self.clear_screen(gs);
+        self.render(gs);
+        gs.backend().flush_buf();
+        loop {
+            if crossterm::event::poll(std::time::Duration::from_millis(250))? {
+                match crossterm::event::read()? {
+                    Event::Resize(width, height) => {
+                        gs.event.push(IdiomEvent::Resize { width, height });
+                        return Err(IdiomError::GeneralError("File open canceled due to screen resize!".into()));
+                    }
+                    Event::Key(KeyEvent { code: KeyCode::Esc, .. }) => return Err(self.cancel_err()),
+                    Event::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+                        return self.return_select();
+                    }
+                    Event::Key(KeyEvent { code: KeyCode::Up, .. }) => {
+                        self.prev_option();
+                    }
+                    Event::Key(KeyEvent { code: KeyCode::Down, .. }) => {
+                        self.next_option();
+                    }
+                    _ => {}
+                }
+                self.render(gs);
+                gs.backend().flush_buf();
+            }
+        }
+    }
+    fn cancel_err(&self) -> IdiomError;
+    fn clear_screen(&self, gs: &mut GlobalState);
+    fn render(&mut self, gs: &mut GlobalState);
+    fn next_option(&mut self);
+    fn prev_option(&mut self);
+    fn return_select(self) -> IdiomResult<Self::R>;
 }
 
 /// uses workaround in order to message if the popup should trigger exit
