@@ -1,6 +1,6 @@
 use super::{
-    Actions, BUFFER, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily, FileType,
-    GlobalState, Lexer, TuiCodec, controls::ControlMap,
+    Actions, BUFFER, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileType, GlobalState,
+    Lexer, TuiCodec, controls::ControlMap,
 };
 use crate::error::{IdiomError, IdiomResult};
 use std::{
@@ -174,10 +174,10 @@ pub fn editor_from_data(
     cfg: &EditorConfigs,
     gs: &mut GlobalState,
 ) -> Editor {
-    let (renderer, lexer) = match file_type.family() {
-        FileFamily::Text => (TuiCodec::text(), Lexer::text_lexer(&path)),
-        FileFamily::MarkDown => (TuiCodec::markdown(), Lexer::md_lexer(&path)),
-        FileFamily::Code(file_type) => (TuiCodec::code(), Lexer::with_context(file_type, &path)),
+    let renderer = match file_type {
+        FileType::Text => TuiCodec::text(),
+        FileType::MarkDown => TuiCodec::markdown(),
+        _ => TuiCodec::code(),
     };
 
     let display = build_display(&path);
@@ -195,7 +195,7 @@ pub fn editor_from_data(
         codec: renderer,
         cursor,
         line_number_padding: line_number_offset,
-        lexer,
+        lexer: Lexer::new(file_type, &path),
         content,
         file_type,
         display,

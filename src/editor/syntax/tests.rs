@@ -474,19 +474,19 @@ pub fn zip_text_tokens(text: Vec<String>, tokens: Vec<SemanticToken>) -> Vec<Edi
 }
 
 pub fn mock_utf8_lexer(file_type: FileType) -> Lexer {
-    let mut lexer = Lexer::with_context(file_type, PathBuf::new().as_path());
+    let mut lexer = Lexer::new(file_type, PathBuf::new().as_path());
     lexer.encoding = Encoding::utf8();
     lexer
 }
 
 pub fn mock_utf16_lexer(file_type: FileType) -> Lexer {
-    let mut lexer = Lexer::with_context(file_type, PathBuf::new().as_path());
+    let mut lexer = Lexer::new(file_type, PathBuf::new().as_path());
     lexer.encoding = Encoding::utf16();
     lexer
 }
 
 pub fn mock_utf32_lexer(file_type: FileType) -> Lexer {
-    Lexer::with_context(file_type, PathBuf::new().as_path())
+    Lexer::new(file_type, PathBuf::new().as_path())
 }
 
 // test tokens

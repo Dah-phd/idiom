@@ -77,75 +77,9 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn with_context(file_type: FileType, path: &Path) -> Self {
+    pub fn new(file_type: FileType, path: &Path) -> Self {
         Self {
             lang: Lang::from(file_type),
-            legend: Legend::default(),
-            uri: as_url(path),
-            path: path.into(),
-            version: 0,
-            requests: Vec::new(),
-            completion_cache: None,
-            diagnostics: None,
-            meta: None,
-            lsp: false,
-            client: LSPClient::placeholder(),
-            context: context_local,
-            completable: completable_disable,
-            autocomplete: get_autocomplete_dead,
-            tokens: tokens_dead,
-            tokens_partial: tokens_partial_dead,
-            references: info_position_dead,
-            definitions: info_position_dead,
-            declarations: info_position_dead,
-            hover: info_position_dead,
-            signatures: info_position_dead,
-            formatting: formatting_dead,
-            sync_tokens: sync_tokens_dead,
-            sync_changes: sync_changes_dead,
-            sync: sync_action_dead,
-            sync_rev: sync_edits_rev_dead,
-            encoding: Encoding::utf32(),
-            question_lsp: false,
-        }
-    }
-
-    pub fn text_lexer(path: &Path) -> Self {
-        Self {
-            lang: Lang::default(),
-            legend: Legend::default(),
-            uri: as_url(path),
-            path: path.into(),
-            version: 0,
-            requests: Vec::new(),
-            completion_cache: None,
-            diagnostics: None,
-            meta: None,
-            lsp: false,
-            client: LSPClient::placeholder(),
-            context: context_local,
-            completable: completable_disable,
-            autocomplete: get_autocomplete_dead,
-            tokens: tokens_dead,
-            tokens_partial: tokens_partial_dead,
-            references: info_position_dead,
-            definitions: info_position_dead,
-            declarations: info_position_dead,
-            hover: info_position_dead,
-            signatures: info_position_dead,
-            formatting: formatting_dead,
-            sync_tokens: sync_tokens_dead,
-            sync_changes: sync_changes_dead,
-            sync: sync_action_dead,
-            sync_rev: sync_edits_rev_dead,
-            encoding: Encoding::utf32(),
-            question_lsp: false,
-        }
-    }
-
-    pub fn md_lexer(path: &Path) -> Self {
-        Self {
-            lang: Lang::default(),
             legend: Legend::default(),
             uri: as_url(path),
             path: path.into(),

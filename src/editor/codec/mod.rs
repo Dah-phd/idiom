@@ -4,7 +4,7 @@ mod text;
 mod utils;
 
 use crate::{
-    configs::{FileFamily, FileType},
+    configs::FileType,
     editor::utils::EditorStats,
     editor::{
         Editor,
@@ -97,20 +97,7 @@ impl TuiCodec {
     }
 
     pub fn single_cursor(&mut self, file_type: FileType) {
-        match file_type.family() {
-            FileFamily::Text => {
-                self.render = text_render;
-                self.fast_render = fast_text_render;
-            }
-            FileFamily::MarkDown => {
-                self.render = md_render;
-                self.fast_render = fast_md_render;
-            }
-            FileFamily::Code(..) => {
-                self.render = code_render;
-                self.fast_render = fast_code_render;
-            }
-        }
+        *self = Self::from(file_type)
     }
 
     fn is_full_render_or_invalidate_lines(editor: &mut Editor) -> bool {
@@ -459,6 +446,16 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) -> Edi
     }
 
     EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
+}
+
+impl From<FileType> for TuiCodec {
+    fn from(file_type: FileType) -> Self {
+        match file_type {
+            FileType::MarkDown => Self::markdown(),
+            FileType::Text => Self::text(),
+            _ => Self::code(),
+        }
+    }
 }
 
 #[cfg(test)]

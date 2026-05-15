@@ -6,7 +6,7 @@ mod utils;
 
 use crate::{
     actions::{Actions, find_line_start},
-    configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs, ScopeType},
+    configs::{EditorAction, EditorConfigs, FileType, IndentConfigs, ScopeType},
     cursor::{Cursor, CursorPosition},
     editor_line::{EditorLine, LineEnd, LineParser},
     error::IdiomResult,
@@ -29,10 +29,6 @@ use utils::{
     select_indent,
 };
 
-const WARN_TXT: &str = "The file is opened in text mode, \
-    beware idiom is not designed with plain text performance in mind!";
-const WARN_MD: &str = "The file is opened in markdown mode, \
-    beware idiom is not designed with MD performance in mind!";
 const FILE_UPDATED_VERSION: i32 = -1;
 const BUFFER: i32 = -2;
 
@@ -52,77 +48,28 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn from_path(
-        path: PathBuf,
-        file_type: FileType,
-        cfg: &EditorConfigs,
-        gs: &mut GlobalState,
-    ) -> IdiomResult<Self> {
+    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
+        let file_type = FileType::derive_type(&path);
+        Self::new(path, file_type, cfg, gs)
+    }
+
+    pub fn new(path: PathBuf, file_type: FileType, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         big_file_protection(&path)?;
         let indent_cfg = cfg.get_indent_cfg(file_type);
         let text = std::fs::read_to_string(&path)?;
         let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg.indent, gs)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
+        let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
         Ok(Self {
-            cursor: Cursor::sized(*gs.editor_area(), line_number_offset),
+            cursor,
             line_number_padding: line_number_offset,
-            lexer: Lexer::with_context(file_type, &path),
+            lexer: Lexer::new(file_type, &path),
             content,
-            codec: TuiCodec::code(),
+            codec: file_type.into(),
             actions: Actions::new(indent_cfg),
             controls: ControlMap::default(),
             file_type,
-            display,
-            saved_version: 0,
-            path,
-            modal: EditorModal::default(),
-        })
-    }
-
-    pub fn from_path_text(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
-        big_file_protection(&path)?;
-        gs.message(WARN_TXT);
-        let indent_cfg = cfg.default_indent_cfg();
-        let text = std::fs::read_to_string(&path)?;
-        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg.indent, gs)?;
-        let display = build_display(&path);
-        let line_number_offset = calc_line_number_offset(content.len());
-        let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
-        Ok(Self {
-            cursor,
-            line_number_padding: line_number_offset,
-            lexer: Lexer::text_lexer(&path),
-            content,
-            codec: TuiCodec::text(),
-            actions: Actions::new(indent_cfg),
-            controls: ControlMap::default(),
-            file_type: FileType::Text,
-            display,
-            saved_version: 0,
-            path,
-            modal: EditorModal::default(),
-        })
-    }
-
-    pub fn from_path_md(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
-        big_file_protection(&path)?;
-        gs.message(WARN_MD);
-        let indent_cfg = cfg.default_indent_cfg();
-        let text = std::fs::read_to_string(&path)?;
-        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg.indent, gs)?;
-        let display = build_display(&path);
-        let line_number_offset = calc_line_number_offset(content.len());
-        let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
-        Ok(Self {
-            cursor,
-            line_number_padding: line_number_offset,
-            lexer: Lexer::text_lexer(&path),
-            content,
-            codec: TuiCodec::markdown(),
-            actions: Actions::new(indent_cfg),
-            controls: ControlMap::default(),
-            file_type: FileType::MarkDown,
             display,
             saved_version: 0,
             path,
@@ -302,35 +249,17 @@ impl Editor {
         if !self.file_type.is_code() {
             return;
         }
-        self.lexer = Lexer::with_context(self.file_type, &self.path);
+        self.lexer = Lexer::new(self.file_type, &self.path);
     }
 
     pub fn file_type_set(&mut self, file_type: FileType, cfg: IndentConfigs, gs: &mut GlobalState) {
         self.actions.cfg = cfg;
         self.file_type = file_type;
-        match self.file_type.family() {
-            FileFamily::Text => {
-                self.codec = TuiCodec::text();
-                self.lexer = Lexer::text_lexer(&self.path);
-                for text in self.content.iter_mut() {
-                    text.tokens_mut().clear();
-                }
-            }
-            FileFamily::MarkDown => {
-                self.codec = TuiCodec::markdown();
-                self.lexer = Lexer::md_lexer(&self.path);
-                for text in self.content.iter_mut() {
-                    text.tokens_mut().clear();
-                }
-            }
-            FileFamily::Code(..) => {
-                self.codec = TuiCodec::code();
-                self.lexer = Lexer::with_context(file_type, &self.path);
-                for text in self.content.iter_mut() {
-                    text.tokens_mut().clear();
-                }
-            }
-        };
+        self.codec = file_type.into();
+        self.lexer = Lexer::new(file_type, &self.path);
+        for text in self.content.iter_mut() {
+            text.tokens_mut().clear();
+        }
         gs.force_screen_rebuild();
     }
 

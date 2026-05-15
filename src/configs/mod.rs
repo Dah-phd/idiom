@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, path::PathBuf};
 pub use theme::Theme;
 pub use theme_ui::UITheme;
-pub use types::{FileFamily, FileType, ScopeType};
+pub use types::{FileType, ScopeType};
 
 // file names
 pub const APP_FOLDER: &str = "idiom";

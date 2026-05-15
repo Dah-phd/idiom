@@ -8,43 +8,6 @@ pub enum ScopeType {
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, Copy, Default, Serialize, Deserialize)]
-pub enum FileFamily {
-    #[default]
-    Text,
-    MarkDown,
-    Code(FileType),
-}
-
-impl FileFamily {
-    pub fn derive_type(path: &Path) -> Self {
-        let Some(extension) = path.extension().and_then(|e| e.to_str()) else {
-            return match path.file_name().and_then(|f| f.to_str()) {
-                Some(".bashrc") => Self::Code(FileType::Shell),
-                _ => Self::Text,
-            };
-        };
-        match extension.to_lowercase().as_str() {
-            "md" => Self::MarkDown,
-            "rs" => Self::Code(FileType::Rust),
-            "zig" => Self::Code(FileType::Zig),
-            "c" => Self::Code(FileType::C),
-            "cpp" => Self::Code(FileType::Cpp),
-            "nim" => Self::Code(FileType::Nim),
-            "py" | "pyw" | "pyi" => Self::Code(FileType::Python),
-            "js" | "jsx" => Self::Code(FileType::JavaScript),
-            "ts" | "tsx" => Self::Code(FileType::TypeScript),
-            "yml" | "yaml" => Self::Code(FileType::Yml),
-            "toml" => Self::Code(FileType::Toml),
-            "html" => Self::Code(FileType::Html),
-            "lobster" => Self::Code(FileType::Lobster),
-            "json" => Self::Code(FileType::Json),
-            "sh" => Self::Code(FileType::Shell),
-            _ => Self::Text,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Hash, Eq, Clone, Copy, Default, Serialize, Deserialize)]
 pub enum FileType {
     #[default]
     Text,
@@ -110,10 +73,6 @@ impl FileType {
         }
     }
 
-    pub fn family(self) -> FileFamily {
-        FileFamily::from(self)
-    }
-
     pub fn is_code(&self) -> bool {
         match self {
             Self::Text | Self::MarkDown => false,
@@ -158,16 +117,6 @@ impl FileType {
     }
 }
 
-impl From<FileFamily> for FileType {
-    fn from(value: FileFamily) -> Self {
-        match value {
-            FileFamily::Text => FileType::Text,
-            FileFamily::MarkDown => FileType::MarkDown,
-            FileFamily::Code(file_type) => file_type,
-        }
-    }
-}
-
 impl From<FileType> for &'static str {
     fn from(value: FileType) -> Self {
         ft_to_str(value)
@@ -177,29 +126,6 @@ impl From<FileType> for &'static str {
 impl From<FileType> for String {
     fn from(value: FileType) -> String {
         ft_to_str(value).to_owned()
-    }
-}
-
-impl From<FileType> for FileFamily {
-    fn from(value: FileType) -> Self {
-        match value {
-            FileType::Text => FileFamily::Text,
-            FileType::MarkDown => FileFamily::MarkDown,
-            FileType::Rust
-            | FileType::Zig
-            | FileType::C
-            | FileType::Cpp
-            | FileType::Nim
-            | FileType::Python
-            | FileType::JavaScript
-            | FileType::TypeScript
-            | FileType::Yml
-            | FileType::Toml
-            | FileType::Html
-            | FileType::Lobster
-            | FileType::Json
-            | FileType::Shell => FileFamily::Code(value),
-        }
     }
 }
 

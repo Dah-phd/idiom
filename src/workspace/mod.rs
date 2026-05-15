@@ -1,6 +1,6 @@
 mod modes;
 use crate::{
-    configs::{EditorConfigs, EditorKeyMap, FileFamily, FileType},
+    configs::{EditorConfigs, EditorKeyMap, FileType},
     cursor::Cursor,
     editor::{Editor, editor_from_data},
     editor_line::EditorLine,
@@ -331,19 +331,16 @@ impl Workspace {
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        Editor::from_path(file_path, FileType::Text, &self.base_configs, gs)
+        Editor::new(file_path, FileType::Text, &self.base_configs, gs)
     }
 
     fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        match FileFamily::derive_type(&file_path) {
-            FileFamily::Text => Editor::from_path_text(file_path, &self.base_configs, gs),
-            FileFamily::MarkDown => Editor::from_path_md(file_path, &self.base_configs, gs),
-            FileFamily::Code(file_type) => {
-                let mut editor = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
-                lsp_enroll(&mut editor, &mut self.lsp_servers, &self.base_configs, gs);
-                Ok(editor)
-            }
+        let mut editor = Editor::from_path(file_path, &self.base_configs, gs)?;
+        match editor.file_type().is_code() {
+            true => lsp_enroll(&mut editor, &mut self.lsp_servers, &self.base_configs, gs),
+            false => gs.message("File is opened in 'text' mode, idiom is designed plain code performance in mind!"),
         }
+        Ok(editor)
     }
 
     // LSP HANDLES

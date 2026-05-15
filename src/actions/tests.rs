@@ -612,7 +612,7 @@ fn push_char_with_closing_and_select() {
     let start = " asd ";
     let end = " [asd] ";
     let cfg = IndentConfigs::default();
-    let mut lexer = Lexer::with_context(FileType::Rust, PathBuf::new().as_path());
+    let mut lexer = Lexer::new(FileType::Rust, PathBuf::new().as_path());
     lexer.intercept_sync(probe_char_closing_with_select);
     lexer.intercept_sync_rev(probe_char_closing_with_select_rev);
     let mut actions = Actions::new(cfg);

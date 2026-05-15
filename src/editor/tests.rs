@@ -28,7 +28,7 @@ pub fn mock_editor_from_elines(content: Vec<EditorLine>) -> Editor {
     let path = PathBuf::from("test-path");
     Editor {
         line_number_padding: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
-        lexer: Lexer::with_context(ft, &path),
+        lexer: Lexer::new(ft, &path),
         file_type: ft,
         display: "".to_string(),
         path,
@@ -52,7 +52,7 @@ pub fn mock_editor_text_render(content: Vec<String>) -> Editor {
     let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
     Editor {
         line_number_padding: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
-        lexer: Lexer::text_lexer(&path),
+        lexer: Lexer::new(FileType::Text, &path),
         file_type: ft,
         display: "".to_string(),
         path,
@@ -72,7 +72,7 @@ pub fn mock_editor_md_render(content: Vec<String>) -> Editor {
     let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
     Editor {
         line_number_padding: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
-        lexer: Lexer::md_lexer(&path),
+        lexer: Lexer::new(FileType::MarkDown, &path),
         file_type: ft,
         display: "".to_string(),
         path,

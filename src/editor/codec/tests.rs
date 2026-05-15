@@ -1,12 +1,45 @@
 use super::TuiCodec;
 use crate::{
-    editor::tests::mock_editor,
+    configs::FileType,
+    editor::tests::{mock_editor, mock_editor_md_render},
     editor_line::RenderStatus,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
 };
+use assert_enum_variants::assert_enum_variants;
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{Backend, layout::Rect};
+
+impl TuiCodec {
+    pub fn is_code(&self) -> bool {
+        let mut editor = mock_editor(vec!["".into(), "fn some() {}".into()]);
+        editor.cursor.text_width = 80;
+        editor.cursor.max_rows = 20;
+        let mut gs = GlobalState::new(Rect::new(0, 0, 80, 20), CrossTerm::init());
+        editor.force_local_lsp_tokens(&mut gs);
+        gs.force_area_calc();
+        (self.render)(&mut editor, &mut gs);
+        let actual = gs.backend.drain().drain(9..13).map(|d| d.1).collect::<Vec<_>>();
+        &actual == &["fn", " ", "some", "() {}"]
+    }
+
+    pub fn is_text(&self) -> bool {
+        !self.is_md() && !self.is_code()
+    }
+
+    pub fn is_md(&self) -> bool {
+        let mut editor = mock_editor_md_render(vec!["".into(), "*BOLD*".into()]);
+        editor.cursor.text_width = 80;
+        editor.cursor.max_rows = 20;
+        let mut gs = GlobalState::new(Rect::new(0, 0, 80, 20), CrossTerm::init());
+        gs.force_area_calc();
+        (self.render)(&mut editor, &mut gs);
+        let Some(drain) = gs.backend.drain().into_iter().nth(8) else {
+            return false;
+        };
+        drain.0 == ContentStyle::ital() && drain.1 == "BOLD"
+    }
+}
 
 pub fn expect_select(
     mut start_char: usize,
@@ -260,4 +293,27 @@ fn test_is_full_render_or_invalidate_lines() {
     assert!(!TuiCodec::is_full_render_or_invalidate_lines(&mut editor));
     assert!(editor.content[4].cached.is_none());
     assert!(editor.content[5].cached.is_none());
+}
+
+#[test]
+fn tui_codec_test_type_helpers() {
+    let md = TuiCodec::markdown();
+    assert!(md.is_md() && !md.is_code() && !md.is_text());
+    let c = TuiCodec::code();
+    assert!(c.is_code() && !c.is_md() && !c.is_text());
+    let t = TuiCodec::text();
+    assert!(t.is_text() && !t.is_md() && !t.is_code());
+}
+
+#[test]
+fn codec_from_type() {
+    assert_enum_variants!(FileType, {
+        MarkDown, Text, Zig, Rust, Python, TypeScript, JavaScript, Html, Nim, C, Cpp, Yml, Toml, Lobster, Json, Shell
+    });
+    for lang in FileType::iter_langs() {
+        assert!(TuiCodec::from(lang).is_code());
+    }
+
+    assert!(TuiCodec::from(FileType::Text).is_text());
+    assert!(TuiCodec::from(FileType::MarkDown).is_md());
 }

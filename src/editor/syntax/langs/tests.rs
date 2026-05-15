@@ -2,9 +2,26 @@ use crate::{
     configs::{FileType, Theme},
     editor_line::EditorLine,
 };
+use assert_enum_variants::assert_enum_variants;
 use idiom_tui::{UTFSafe, widgets::Writable};
 
 use super::Lang;
+
+impl Lang {
+    pub fn is_empty(&self) -> bool {
+        self.compl_trigger_chars.is_empty()
+            && self.comment_start.is_empty()
+            && self.declaration.is_empty()
+            && self.key_words.is_empty()
+            && self.flow_control.is_empty()
+            && self.mod_import.is_empty()
+            && self.string_markers.is_empty()
+            && self.escape_chars.is_empty()
+            && self.completion_data_handler.is_none()
+            && self.diagnostic_handler.is_none()
+            && self.lang_specific_handler.is_none()
+    }
+}
 
 pub fn create_text() -> [String; 16] {
     [
@@ -66,4 +83,16 @@ fn test_completable() {
     assert!(!lang.completable(&line, 6));
     let line = EditorLine::from("struct Um");
     assert!(!lang.completable(&line, 9));
+}
+
+#[test]
+fn test_from_file_type_empty() {
+    assert_enum_variants!(FileType, {
+        MarkDown, Text, Zig, Rust, Python, TypeScript, JavaScript, Html, Nim, C, Cpp, Yml, Toml, Lobster, Json, Shell
+    });
+    for lang in FileType::iter_langs() {
+        assert!(!Lang::from(lang).is_empty());
+    }
+    assert!(Lang::from(FileType::Text).is_empty());
+    assert!(Lang::from(FileType::MarkDown).is_empty());
 }
