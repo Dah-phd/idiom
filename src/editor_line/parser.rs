@@ -240,7 +240,7 @@ impl ParsedLines<'_> {
     }
 }
 
-struct ConfirmParsedLoading<'a> {
+pub struct ConfirmParsedLoading<'a> {
     parsed: ParsedLines<'a>,
     load_option: LoadingType,
     indent: &'a str,
@@ -272,22 +272,14 @@ impl<'a> BasicConfirmPopup for ConfirmParsedLoading<'a> {
         };
         let Some(line) = lines.next() else { return };
         line.render_styled("Handle choices:", ContentStyle::bold(), gs.backend());
-        let choice = match self.load_option {
-            LoadingType::Sanitized => 0,
-            LoadingType::LoadAsIs => 1,
-            LoadingType::Cancel => 2,
-        };
-        for (choice_idx, text) in ["sanitize", "do not sanitize - load as is", "cancel"].iter().enumerate() {
+        for opt in LoadingType::iter() {
             let Some(line) = lines.next() else { return };
-            match choice == choice_idx {
-                true => {
-                    line.render_styled(&format!(" >> {text}"), ContentStyle::reversed(), gs.backend());
-                }
-                false => {
-                    line.render(&format!("    {text}"), gs.backend());
-                }
+            match opt == self.load_option {
+                true => line.render_styled(&format!(" >> {}", opt.as_str()), ContentStyle::reversed(), gs.backend()),
+                false => line.render(&format!("    {}", opt.as_str()), gs.backend()),
             }
         }
+
         if !self.parsed.replaced_esc_cc.is_empty() {
             let Some(line) = lines.next() else { return };
             line.render_styled(
@@ -340,10 +332,35 @@ impl<'a> BasicConfirmPopup for ConfirmParsedLoading<'a> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 enum LoadingType {
     #[default]
     Sanitized,
     LoadAsIs,
     Cancel,
+}
+
+impl LoadingType {
+    const fn iter() -> [LoadingType; 3] {
+        [Self::Sanitized, Self::LoadAsIs, Self::Cancel]
+    }
+
+    const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Sanitized => "sanitize",
+            Self::LoadAsIs => "do not sanitize - load as is",
+            Self::Cancel => "cancel",
+        }
+    }
+}
+
+#[cfg(test)]
+mod mock {
+    use super::{ConfirmParsedLoading, LoadingType, ParsedLines};
+
+    impl<'a> ParsedLines<'a> {
+        pub fn mock_popup(self, indent: &'a str) -> ConfirmParsedLoading<'a> {
+            ConfirmParsedLoading { parsed: self, load_option: LoadingType::Sanitized, indent }
+        }
+    }
 }

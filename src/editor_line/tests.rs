@@ -5,9 +5,11 @@ use crate::{
     configs::IndentConfigs,
     editor::{syntax::Encoding, tests::mock_editor_from_elines},
     editor_line::EditorLine,
-    ext_tui::CrossTerm,
+    ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
+    popups::generic_popup::BasicConfirmPopup,
 };
+use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{Backend, layout::Rect};
 use logos::Logos;
 
@@ -420,4 +422,97 @@ fn test_sanitize_text() {
         indent_cfg.indent.as_str(),
     );
     assert_eq!(result, "tesea\nadwa\nadwadw\nawe    s\nawdwe\nda\na");
+}
+
+#[test]
+fn test_parser_popup() {
+    let indent_cfg = IndentConfigs::default();
+    let parsed = LineParser::split_lines(
+        "tesea\na\u{001B}\u{0008}dwa\r\nad\u{001B}wadw\u{000C}aw\u{0008}e\ts\u{000B}a\u{0008}wd\u{001B}we\r\nda\n\ra",
+    );
+    let mut popup = parsed.mock_popup(indent_cfg.indent.as_str());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 100, 20), CrossTerm::init());
+    gs.force_area_calc();
+    popup.render(&mut gs);
+    let expect = [
+        (ContentStyle::bold(), "<<set style>>".to_string()),
+        (ContentStyle::default(), "<<go to row: 4 col: 18>>".to_string()),
+        (ContentStyle::bold(), "Found unexpected formatting:".to_string()),
+        (ContentStyle::bold(), "<<padding: 32>>".to_string()),
+        (ContentStyle::default(), "<<set style>>".to_string()),
+        (ContentStyle::bold(), "<<set style>>".to_string()),
+        (ContentStyle::default(), "<<go to row: 5 col: 18>>".to_string()),
+        (ContentStyle::bold(), "    Used tabs instead of space indent: present!".to_string()),
+        (ContentStyle::bold(), "<<padding: 13>>".to_string()),
+        (ContentStyle::default(), "<<set style>>".to_string()),
+        (ContentStyle::bold(), "<<set style>>".to_string()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_string()),
+        (ContentStyle::bold(), "    Used non posix line ends: present!".to_string()),
+        (ContentStyle::bold(), "<<padding: 22>>".to_string()),
+        (ContentStyle::default(), "<<set style>>".to_string()),
+        (ContentStyle::bold(), "<<set style>>".to_string()),
+        (ContentStyle::default(), "<<go to row: 7 col: 18>>".to_string()),
+        (ContentStyle::bold(), "Handle choices:".to_string()),
+        (ContentStyle::bold(), "<<padding: 45>>".to_string()),
+        (ContentStyle::default(), "<<set style>>".to_string()),
+        (ContentStyle::reversed(), "<<set style>>".to_string()),
+        (ContentStyle::default(), "<<go to row: 8 col: 18>>".to_string()),
+        (ContentStyle::reversed(), " >> sanitize".to_string()),
+        (ContentStyle::reversed(), "<<padding: 48>>".to_string()),
+        (ContentStyle::default(), "<<set style>>".to_string()),
+        (ContentStyle::default(), "<<go to row: 9 col: 18>>".to_string()),
+        (ContentStyle::default(), "    do not sanitize - load as is".to_string()),
+        (ContentStyle::default(), "<<padding: 28>>".to_string()),
+        (ContentStyle::default(), "<<go to row: 10 col: 18>>".to_string()),
+        (ContentStyle::default(), "    cancel".to_string()),
+        (ContentStyle::default(), "<<padding: 50>>".to_string()),
+        (ContentStyle::bold().with_fg(Color::Red), "<<set style>>".to_string()),
+        (ContentStyle::default(), "<<go to row: 11 col: 18>>".to_string()),
+        (
+            ContentStyle::bold().with_fg(Color::Red),
+            "Found U+001B ESC Control char -> will be stripped from text!".to_string(),
+        ),
+        (ContentStyle::default(), "<<set style>>".to_string()),
+        (ContentStyle::bold().with_fg(Color::Red), "<<set style>>".to_string()),
+        (ContentStyle::default(), "<<go to row: 12 col: 18>>".to_string()),
+        (
+            ContentStyle::bold().with_fg(Color::Red),
+            "Found U+0008 BACKSPACE Control char -> will be stripped from".to_string(),
+        ),
+        (ContentStyle::default(), "<<set style>>".to_string()),
+    ];
+    assert_eq!(expect.as_slice(), gs.backend().drain());
+
+    popup.next_option();
+    popup.render(&mut gs);
+    let writer_drain = gs.backend().drain();
+    assert_eq!(writer_drain[21].1.as_str(), "    sanitize");
+    assert_eq!(writer_drain[25].1.as_str(), " >> do not sanitize - load as is");
+    assert_eq!(writer_drain[29].1.as_str(), "    cancel");
+
+    popup.next_option();
+    popup.render(&mut gs);
+    let writer_drain = gs.backend().drain();
+    assert_eq!(writer_drain[21].1.as_str(), "    sanitize");
+    assert_eq!(writer_drain[24].1.as_str(), "    do not sanitize - load as is");
+    assert_eq!(writer_drain[28].1.as_str(), " >> cancel");
+
+    popup.prev_option();
+    popup.render(&mut gs);
+    let writer_drain = gs.backend().drain();
+    assert_eq!(writer_drain[21].1.as_str(), "    sanitize");
+    assert_eq!(writer_drain[25].1.as_str(), " >> do not sanitize - load as is");
+    assert_eq!(writer_drain[29].1.as_str(), "    cancel");
+
+    popup.clear_screen(&mut gs);
+    let writer_drain = gs.backend().drain();
+    let mut idx = 1;
+    assert_eq!(36, writer_drain.len());
+    loop {
+        assert_eq!(writer_drain[idx].1, "<<padding: 84>>");
+        idx += 2;
+        if idx > writer_drain.len() {
+            break;
+        }
+    }
 }
