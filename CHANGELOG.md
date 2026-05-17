@@ -2,6 +2,7 @@
 # Version 0.8.2
 - added popup in pallet to select different line end (on current selected line)
 - added pallet entry to strip control chars
+- added on open big file confirm and control char confirm
 
 # Version 0.8.1
 - improved mouse handle on workspace tab interaction
