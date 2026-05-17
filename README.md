@@ -1,6 +1,6 @@
-# Low config terminal code editor - designed for me
-
 # MOVED TO [codeberg](https://codeberg.org/dah-phd/idiom)
+
+# Low config terminal code editor - designed for me
 
 ## Second repo
 ![codeberg](https://codeberg.org/dah-phd/idiom)
